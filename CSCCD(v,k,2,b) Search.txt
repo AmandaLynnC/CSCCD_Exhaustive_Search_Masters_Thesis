@@ -1,0 +1,2365 @@
+###########################################################
+#####                    READ ME                        ###
+###########################################################
+# Writen in SageMath                                    ###
+###########################################################
+# To run the program run main(v,k)                      ###
+# v is the number of elments in the design              ###
+# k is the block size                                   ###
+# When finished it will brint out the built designs     ###
+#                                                       ###
+# running main(12,4) will take about 2 days on the      ###
+# specs given in my thesis                              ###
+###########################################################
+
+
+#################################
+##### LIST OF ALL FUNCTIONS #####
+#################################
+
+# TO BUILD THE SF ARRAY
+############################################################################################################################################################################################
+# build_sf_array(s_position_list,f_position_list,f_i,sf_array):                          ### builds a possible sf_array which needs to be checked. RETURNS a single sf_array             ###
+# generate_t_values(k,v):                                                                ### Gives all possible combinations of t_values. Returns a list master_t_list                   ###
+# generate_all_valid_sf_array(v,k,b,t_i,f_i):                                            ### Generates all valid sf_arrays. RETURNS a List of sf_arrays                                  ###
+# generate_skeleton(sf_array,f_i,b):                                                     ### Generates the skeleton of a single sf_array. RETURNS the skeleton of the sf_array.          ###
+# generate_all_skeletons(all_valid_sf_array,f_i,b):                                      ### Generates the list of all possible skeletons. RETURNS LIST of possible skeletons.           ###
+# check_single_skeleton(all_valid_sf_array, skeleton, f_i):                              ### Checks a single skeleton to see if it is valid. RETURNS a BOOLEAN                           ###
+# check_all_possible_skeletons(all_valid_sf_array, all_possible_skeletons, f_i):         ### Checks every skeleton to see if it is valid, RETUNRS a list of all valid skeletons          ###
+# eliminate_equivalence_classes(all_valid_skeletons):                                    ### Eliminates equivalence classes. RETURNS a list of distinct skeleton_classes                 ###
+# build_var_of_all_potential_block_list_stage_1(b,skeleton,f_i,k,t_i):                       ### this goes throught the list so that the ONE version can hand individuals better             ###
+# build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k): added stuff           ### Finds all the possible combinations SF array constructions so we do not miss any designs    ###
+#                                                                                        #   Needed becasue keeping track of positions of elements is important, this allows things to 
+#                                                                                        #   be added in varying positions.
+############################################################################################################################################################################################
+
+# TO GET THE SKELETONS THAT WILL RESULT IN LESS CHOICE FOR T_i >= 2
+############################################################################################################################################################################################
+# find_best_place_to_start_all_skeletons(b,skeleton,f_1,k)                               ### just go through list applying the one skeleton variation                                    ###
+# find_best_place_to_start_one_skeleton(b,skeleton,f_i,k)                                ### We want to start the design's t_1 insertion whereever the most elements are in block 1      ###
+#                                                                                            If this number is tied we start with the earliest option                                    ###
+# generate_count_of_num_of_var_in_block(b,skeleton,f_i)                                  ### Count the num of variables in each block                                                    ###
+# generate_flag_list(b,num_of_var_in_block,k)                                            ### Find all where k or k-1 pos filled                                                          ###
+# find_longest_run(b,skeleton,f_i,flag_of_good_starts)                                   ### Find the  k / k-1 runs starting at each block                                               ###
+# find_highest_num(highest_run_count)                                                    ### Find the longest k / k-1 run                                                                ###
+# rotate_skeleton_to_best_start_pos(skeleton,sf_start_pos)                               ### rotate the skeleton to start at the longest run                                             ###
+############################################################################################################################################################################################
+
+
+# PRINT FUNCTIONS
+############################################################################################################################################################################################
+# print_equivalence_skeletons(equivalence_skeletons):                                    ### Prints one skeleton from each equivalence class                                             ###
+# print_optimal_skeletons(optimal_skeletons):                                            ### Prints the skeletons at their optimal start pos                                             ###
+# print_block_list_stage_1(all_potential_block_list_stage_1):                            ### Prints the block list after f_1 is finished generating the designs so far.                  ###
+############################################################################################################################################################################################
+
+# TO COMPLETE THE DESEIGN
+####################################################################################################################################################################################################
+# generate_covering_dict(v):                                                             ### Builds the covering dictionary. RETUNRS a dictonary                                                 ###
+# add_covering(x,curr_introduced,covering_dict):                                         ### Adds a covered pair to the covering dictionary. RETURNS a dictionary                                ###
+# delet_covering(x,curr_introduced,covering_dict):                                       ### Removes a covered pair from the covering dictionary. RETURNS a dictonary                            ###
+# check_if_already_covered(x,curr_introduced,covering_dict):                             ### Checks to see if a pair is already in the dictonary. RETURNS Boolean                                ###
+# check_if_new_point_exceeds_intro(new_point,intro_list,intro_limit):                    ### Checks to see if the new point added exceeds the introduction limit. RETURNS Boolean                ###
+# check_if_new_point_exceeds_freq(new_point,freq_list,freq_limit):                       ### Checks to see if the new point added exceeds the freqency limit. RETURNS Boolean                    ###
+####################################################################################################################################################################################################
+# update(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added, list_of_okay_starts,new_point,       ###
+#            pos_of_list_of_okay_start,skeleton):                                                                                                                                                         ###
+#                                                                                        ### Updates the scccd if you are INTRODUCING an element that is NOT FORCED                              ###
+# un_update(pos_of_list_of_okay_starts,intro_list,freq_list,list_of_elements_added,list_of_introductions,new_point,list_of_okay_starts,flag_list_okay_starts_increase,scccd,
+#            block_i,covering_dict):                                                                                                                                                             ###                                                                       
+#                                                                                        ### Un-updates the scccd if you are INTRODUCING an element that is NOT FORCED                           ###
+# update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,skeleton,skeleton):                                                                     ###
+#                                                                                        ### Updates the scccd if you are INTRODUCING an element that is FORCED                                  ###
+# un_update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,skeleton):                                                                           ###
+#                                                                                        ### Un-updates the scccd if you are INTRODUCING an element that is FORCED                               ###
+# update_single_element(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,skeleton):                                                                                   ###
+#       obs                                                                                 ### Updates the scccd if you are CARRYIING an element from the UNCHANGED SUBSET                         ###
+# un_update_single_element(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point):                                                                                ###
+#       obs                                                                                 ### Un-updates the scccd if you are CARRYIING an element from the UNCHANGED SUBSET                      ###
+# update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added,           ###
+#                                      list_of_okay_starts,new_point, pos_of_list_of_okay_start,skeleton):                                                                                         ###
+#                                                                                        ### Updates the scccd if you are CARRYING an UNKNOWN element from the UNCHANGED SUBSET (1st block needs)###
+# un_update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,list_of_elements_added):                                             ###
+#                                                                                                                                                                                                ###
+####################################################################################################################################################################################################
+# check_circular_property(scccd,k,bl_i,found_designs,type,intro_limit,intro_list,freq_limit,freq_list,t_i):                                                                                      ###
+#                                                                                        ### Checks that the single change property holds between block b and 0                                  ###
+# add_design_to_found_list(scccd,found_designs,type):                                    ### How we get around only the reference being passed. RETUNRS N/A                                      ###
+# complete_the_scccd(v,k,all_potential_block_list_stage_1,t_i,f_i,type,found_designs,skeleton):
+                                                                                         ### Gets the design ready for the rest of the search. Generates freq_limit, intro_limit, covering_dict. ###
+# recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,skeleton):                                                                      ###
+#                                                                                        ### WIP                                                                                                 ###
+####################################################################################################################################################################################################
+                                                                                            
+#OPTIMIZATIONS                                                                              
+####################################################################################################################################################################################################
+# Ensures smaller numbers are introduced first in each t_i ###                                                                                                                                   ###
+# OPTIMIZATION 1: ############################################                                                                                                                                   ###
+# optimize_lower_number_introduced_first(list_of_okay_starts,new_point,equivalence_flag,pos_of_list_of_okay_starts):                                                                             ###
+#
+####################################################################################################################################################################################################
+# Minor Varients - top of 404 on paper                                                                                                         
+# OPTIMIZATION 2:  ###########################################                                                                                                                                   ###
+#   ###
+#   ###
+#
+# ########################################################################
+# ### ENSURES X CANT LEAVE IF IT NEEDS TO COVER LESS THEN k-1 elements ###                                                                                                                       ###
+# OPTIMIZATION 3: ########################################################                                                                                                                       ###
+# optimization_3(v,k,scccd,block_i,covering_dict,new_point,pos,freq_list,list_of_elements_added,intro_list,intro_limit,skeleton,freq_limit) :  
+#   ###
+#   ###
+#############################################################################
+# ### END PERMUTATIONS                                                    ###
+# ### - ensures that if x&y have same coverings at this point then x is used before y if x<y
+# ### - can only do if comparing 2 things not it 1st block or both in 1st block
+# OPTIMIZATION 4:                                                                                                                                                                                ###
+#   ###
+#   ###
+####################################################################################################################################################################################################
+ 
+#OPTIMIZATIONS UPDATES / UN_UPDATES                                                                             
+####################################################################################################################################################################################################
+# Ensures smaller numbers are introduced first in each t_i ###                                                                                                                                   ###
+# OPTIMIZATION 1: ############################################                                                                                                                                   ###
+# optimize_lower_number_introduced_first(list_of_okay_starts,new_point,equivalence_flag,pos_of_list_of_okay_starts):                                                                             ###
+#                                                                                                                                                                                                ###    
+# OPTIMIZATION 2:                                                                                                                                                                                ###
+#   ###
+#   ###
+#
+# ########################################################################
+# ### ENSURES X CANT LEAVE IF IT NEEDS TO COVER LESS THEN k-1 elements ###                                                                                                                       ###
+# OPTIMIZATION 3: ########################################################                                                                                                                       ###
+# optimization_3_un_update(v,k,scccd,block_i,covering_dict,new_point,pos) :  
+#   ###
+#   ###
+# OPTIMIZATION 4:                                                                                                                                                                                ###
+#   ###
+#   ###
+####################################################################################################################################################################################################
+    
+
+#########################################
+###### TESTING VALID SKELETON CODE ######
+#########################################
+def test_valid_skeletons(all_valid_sf_array,all_possible_skeletons,f_i):
+#    all_valid_skeletons = check_all_possible_skeletons(all_valid_sf_array,['SF','F','S','F','F','SF','','SF','SF','','SF',''],f_i[0])
+#    print ("TEST 1 (1 sf_array): VALID : ",all_valid_skeletons, "NONE SHOULD BE HERE")
+#    all_valid_skeletons = check_all_possible_skeletons(all_valid_sf_array,[['SF','F','S','F','F','SF','','SF','SF','','SF','']],f_i[0])
+#    print ("TEST 2 : VALID : ",all_valid_skeletons, "NONE SHOULD BE HERE")
+#    all_valid_skeletons = check_all_possible_skeletons(all_valid_sf_array,[['SF','F','S','F','F','SF','','SF','SF','','SF',''],['SF', '', 'SF', 'F', '', 'SF', '', 'SF', '', 'S', 'SF', '']],f_i[0])
+#    print ("TEST 3 : VALID : ",all_valid_skeletons, "1 SHOULD BE HERE")
+
+    return 
+
+
+#####################################
+##### NAME: build_sf_array      #####
+##### IN  : s_position_list     #####
+#####     : f_position_list     #####
+#####     : f_i                 #####
+#####     : sf_array            #####
+##### OUT : a possible sf_array #####
+#####################################
+def build_sf_array(s_position_list,f_position_list,f_i,sf_array):
+    for i in range(f_i[0]):
+        if i in s_position_list:
+            if i in f_position_list:
+                sf_array.append('SF')
+            else:
+                sf_array.append('S')
+        else:
+            if i in f_position_list:
+                sf_array.append('F')
+            else:
+                sf_array.append('')
+            
+    return sf_array
+    
+
+####################################
+##### NAME: generate_t_values  #####
+##### IN  : k                  #####
+#####     : v                  #####
+##### OUT : master_t_list      #####
+####################################
+def generate_t_values(v,k):
+    b = binomial(v,2)/binomial(k-1,1)
+    A = floor((v-1)/(k-1))
+    print ("b =", b, " A =", A)
+    master_t_list = []
+    for temp in Partitions(NN(b-v),min_part=1,max_part=A-1):
+    #    print temp, temp.to_exp(A-1)
+        t_list = [2*v-b]
+        t_list.extend([temp.to_exp(A-1)[i] for i in range(A-1)])
+        for i in range(2,A):
+            t_list[0] += (i-1)*t_list[i]
+        pass_flag = True
+        if ((v-1) % (k-1)) == 0:
+            # f_j = j test
+            if t_list[A-1] > 1:
+                pass_flag = False
+        if ((v-2) % (k-1)) ==0:
+            # f_j = j+1 test
+            if t_list[(v-2)/(k-1)]  > 2:
+                pass_flag = False
+        if t_list[0] < 0:
+            pass_flag = False
+        if pass_flag:     
+            print (t_list)
+            master_t_list.append(t_list)
+    return master_t_list
+    
+#################################################
+##### NAME: generate_all_valid_sf_array     #####
+##### IN  : v                               #####
+#####     : k                               #####
+#####     : b                               #####
+#####     : t_i                             #####
+#####     : f_i                             #####
+##### OUT : list of possible sf_arrays      #####
+#################################################
+def generate_all_valid_sf_array(v,k,b,t_i,f_i):
+    list_of_valid_sf_array = []
+
+    min_s = t_i[0] + 1 - min(k,t_i[0])
+#    print ("min_s is:",min_s)
+    max_f = min(k,t_i[0])
+#    print ("max_f is:",max_f)
+    import itertools
+    possible_rows = ['SF','S','F','']
+#    z_count = 0
+    for num_s in range(min_s,v+1):
+#        num_f = min(v-num_s,max_f)
+        for num_f in range(1,max_f+1):
+      
+            for s_positions in itertools.combinations(range(1,f_i[0]+1),num_s-1):
+                s_position_list = list(s_positions)
+                s_position_list.insert(0,0)
+                for f_positions in itertools.combinations(range(0,f_i[0]-1),num_f-1):
+                    f_position_list = list(f_positions)
+                    f_position_list.append(f_i[0]-1)
+                    
+                    sf_array = []
+                    build_sf_array(s_position_list,f_position_list,f_i,sf_array)
+                    check_pass       = True
+                    symbol_count     = 0     ### used to check (P4)
+                    s_count          = 0     ### used to check (P5) - the number of S's in or above row R
+                    s_count_adjacent = 0     ### used to check (P7) - the weight of the second row in 2 adjecent rows (find weight with P5) 
+                    ss_count         = 0     ### used to check (P8) & (P9)
+                    ff_count         = 0     ### used to check (P8) & (P9)
+                    
+                    
+                    
+#                    ### for debugging (9,4) (5,5,0) = (T1,T2,T3)
+#                    if (sf_array == ['SF','F','','F','','','SF']) or (sf_array == ['SF','','','S','S','','SF']) or (sf_array == ['S','S','','SF','','','SF']) or (sf_array == ['S','','SF','','','SF','F']) or (sf_array == ['SF','','','SF','F','','F']) or (sf_array == ['SF','','F','F','','','SF']) or (sf_array == ['SF','','','S','','S','SF']) or (sf_array == ['S','','S','SF','','','SF']) or (sf_array == ['S','SF','','','SF','','F']) or (sf_array == ['SF','','','SF','','F','F']) or (sf_array == ['SF','F','','','SF','','F']) or (sf_array == ['SF','','F','','','S','SF']) or (sf_array == ['S','SF','','','S','','SF']) or (sf_array == ['SF','','','S','','SF','F']) or (sf_array == ['S','','SF','F','','','SF']) or (sf_array == ['SF','F','','','S','','SF']) or (sf_array == ['S','','SF','','','S','SF']) or (sf_array == ['SF','','','S','SF','','F']) or (sf_array == ['S','SF','','F','','','SF']) or (sf_array == ['SF','','F','','','SF','F'])or (sf_array == ['SF','F','','','S','F','F']) or (sf_array == ['S','F','F','','','S','SF']) or (sf_array == ['S','SF','','','','S','SF']) or (sf_array == ['SF','','','','S','SF','F']) or (sf_array == ['S','SF','F','','','S','F']) or sf_array == ['SF','F','','','S','S','F']) or (sf_array == ['S','S','F','','','S','SF']) or (sf_array == ['S','F','','','S','SF','F']) or (sf_array == ['S','SF','F','','','','SF']) or (sf_array == ['SF','F','','','','SF','F']) or (sf_array == ['SF','F','','','','S','SF']) or (sf_array == ['S','SF','','','S','S','F']) or (sf_array == ['SF','','','S','S','F','F']) or (sf_array == ['S','S','F','F','','','SF']) or (sf_array == ['S','F','F','','','SF','F']) or (sf_array == ['SF','','','SF','','','SF']) :
+#                        print (sf_array ,"I am here with check_pass = ", check_pass)
+    
+    
+#                    if (sf_array == ['S', '', 'SF', '', '', 'SF', 'F']):
+#                        print "BOOOO IM HERE!"
+    
+    
+                    for i in range(f_i[0]):             
+                        ### CHECK P2 & P3
+                        if 'F' in sf_array[i]:
+                            ### CHECK FOR the # of empty rows between symbols (P2) ###
+                            empty_count = 0
+                            for j in range(i+1,f_i[0]):
+                                if len(sf_array[j]) == 0:
+                                    empty_count += 1
+                                if 'S' in sf_array[j]:
+                                    if empty_count < (b-2*f_i[0]+1):
+                                        check_pass = False
+                                    break
+                            
+                            if check_pass == False:
+                                break    
+                            ### CHECK FOR 3 'F' in a row (P3) ###
+                            if i+2 < len(sf_array):
+                                if 'F' in sf_array[i+1]:
+                                    if 'F' in sf_array[i+2]:       
+                                        check_pass = False
+                                        continue
+                                        
+                            if check_pass == False:
+                                break    
+                            ### COUNT # of valid 'FF' occurences (P8) & (P9) ###
+                            if i+1 < len(sf_array):
+                                if 'F' in sf_array[i+1]:
+                                    ff_count = ff_count + 1
+                                    
+                        if check_pass == False:
+                            break            
+                        ### CHECK FOR 3 'S' in a row (P3) ###
+                        if 'S' in sf_array[i]:
+                            if i == f_i[0]-1:
+                                last_s_flag = True
+                            if i+2 < len(sf_array):
+                                if 'S' in sf_array[i+1]:
+                                    if 'S' in sf_array[i+2]:       
+                                        check_pass = False
+                                        continue
+                            
+                            ### (P5) ###
+                            s_count          = s_count + 1
+                            f_count          = 0
+                            
+                            for j in range(i,f_i[0]):
+                                if 'F' in sf_array[j]:
+                                    f_count = f_count+1
+                            if s_count + f_count - 1 > k:
+                                check_pass = False
+                                break
+                            
+                            if check_pass == False:
+                                break
+                            ### COUNT weight of adjacent row (P7)            ###
+                            ### COUNT # of valid 'SS' occurences (P8) & (P9) ###
+                            if i+1 < len(sf_array):
+                                ### (P7) ###
+                                ### (P8) (P9) ###
+                                if 'S' in sf_array[i+1]:
+                                    s_count_adjacent = s_count+1
+                                    ss_count = ss_count + 1
+                                else:
+                                    s_count_adjacent = s_count
+                                if (s_count + f_count - 1) == k:
+                                    f_count_adjacent = 0
+                                    for j in range (i+1,f_i[0]):
+                                        if 'F' in sf_array[j]:
+                                            f_count_adjacent += 1    
+                                    if (s_count_adjacent + f_count_adjacent - 1) == k:
+                                        check_pass = False
+                                        break
+                            if check_pass == False:
+                                break          
+                            ### CHECKING (P10) ###
+                            if f_count > min(t_i[0],k):
+                                check_pass = False
+                                
+                                break
+ 
+                        
+                        ### CHECK the # of symbols |S|+|F| = t_1 + 1 (P4) ###
+                        symbol_count = symbol_count + len(sf_array[i])
+                        
+                        
+                        
+                    ### CHECKING (P4) ###
+                    if symbol_count != (t_i[0]+1):
+                        check_pass = False
+                        
+                    ### CHECKING (P8) ###
+                    if ss_count > floor(k/2):
+                        check_pass = False
+                        
+                    ### CHECKING (P8) ###
+                    if ff_count > floor(k/2):
+                        check_pass = False
+                        
+                    ### CHECKING (P9) ###
+                    if ss_count + ff_count > k-1:
+                        check_pass = False
+
+
+                                  
+#                    ### for debugging (9,4)
+#                    if sf_array == ['SF','F','','SF','','SF'] or  sf_array == ['SF','','SF','','S','SF'] or sf_array == ['SF','','S','SF','','SF'] or sf_array == ['S','SF','','SF','','SF'] or if sf_array == ['SF','','SF','','SF','F'] or  if sf_array == ['SF','','SF','F','','SF'] or sf_array == ['SF','F','','S','SF','F'] or sf_array == ['S','SF','F','','S','SF']
+#                        print (sf_array ,"I am here with check_pass = ", check_pass)
+
+#                    ### for debugging (9,4) (6,3,1) = (T1,T2,T3)
+#                    if sf_array == ['S','SF','F','','','S','SF']:
+#                        print (sf_array ,"I am here with check_pass = ", check_pass)             
+
+
+      
+                    if check_pass == True:
+#                        print (sf_array)
+                        list_of_valid_sf_array.append(sf_array)
+#                    print (sf_array)                                        ################## 
+    
+                
+    return list_of_valid_sf_array
+     
+    
+########################################################
+##### NAME: generate_skeleton                      #####
+##### IN  : sf_array                               #####
+#####     : f_i                                    #####
+##### OUT : single skeleton bassed on the sf_array #####
+########################################################
+def generate_skeleton(sf_array,f_i,b):
+    skeleton_s_position_list = []
+    skeleton_f_position_list = []
+ 
+    for i in range(f_i[0]):
+        if 'S' in sf_array[i]:
+            skeleton_s_position_list.append(i)
+            skeleton_f_position_list.append(i+f_i[0]-1)
+        if 'F' in sf_array[i]:
+            skeleton_s_position_list.append(b+i-f_i[0]+1)
+            skeleton_f_position_list.append(i)
+    
+    skeleton = []        
+    build_sf_array(skeleton_s_position_list,skeleton_f_position_list,b,skeleton)
+    return skeleton
+
+
+################################################
+##### NAME: generate_all_skeletons         #####
+##### IN  : all_valid_sf_array             #####
+#####     : f_i                            ##### 
+##### OUT : list of all possible skeletons #####
+################################################
+def generate_all_skeletons(all_valid_sf_array, f_i,b):
+    all_possible_skeletons = []
+    for i in range (len(all_valid_sf_array)):
+        all_possible_skeletons.append(generate_skeleton(all_valid_sf_array[i],f_i,b))
+    return all_possible_skeletons
+
+
+########################################
+##### NAME : check_single_skeleton #####
+##### IN   : all_valid_sf_array    #####
+#####      : skeleton              #####
+#####      : f_i                   #####
+##### OUT  : BOOLEAN               #####
+########################################        
+def check_single_skeleton(all_valid_sf_array,skeleton,f_i):
+    check_pass = True
+    for i in range (1,len(skeleton)):
+        if 'S' in skeleton[i]:
+            ### build the sf_array we want to check here ###
+            check_sf_array = []
+            for j in range(f_i[0]):
+                check_sf_array.append(skeleton[(i+j)% (len(skeleton))])
+            if check_sf_array not in all_valid_sf_array:
+                check_pass = False
+                return False
+                break           
+    return check_pass
+        
+        
+##############################################
+##### NAME: check_all_possible_skeletons #####
+##### IN  : all_valid_sf_array           #####
+#####     : all_possible_skeletons       #####
+#####     : f_i                          ##### 
+##### OUT : list of all valid skeletons  #####
+##############################################
+def check_all_possible_skeletons(all_valid_sf_array,all_possible_skeletons,f_i):
+    check_pass = True
+    all_valid_skeletons   = []
+    all_invalid_skeletons = []
+    for i in range(len(all_possible_skeletons)):
+        check_pass = check_single_skeleton(all_valid_sf_array,all_possible_skeletons[i],f_i) 
+        if check_pass == True:
+            all_valid_skeletons.append(all_possible_skeletons[i])
+        else :
+            all_invalid_skeletons.append(all_possible_skeletons[i])
+#            print ("Invalid skeletons are: ", all_invalid_skeletons)                ### Debugging 
+    return all_valid_skeletons
+
+
+################################################
+##### NAME : eliminate_equivalence_classes #####
+##### IN   : all_valid_skeletons           #####
+##### OUT  : skeleton_classes              #####
+################################################
+def eliminate_equivalence_classes(all_valid_skeletons):
+    skeleton_classes = []
+    skeleton_classes.append(all_valid_skeletons[0])
+    if len(all_valid_skeletons) == 1 :
+        return skeleton_classes    
+    for i in range(1,len(all_valid_skeletons)):
+        check_pass = False
+        for j in range(len(skeleton_classes)):
+            for t in range (len(skeleton_classes[j])):
+                cycled = []
+                for k in range (len(skeleton_classes[j])):
+                    if k == 0:
+                        if 'S' not in skeleton_classes[j][(t+k)%(len(all_valid_skeletons[0]))]:
+                            break
+                    cycled.append(skeleton_classes[j][(t+k)%(len(all_valid_skeletons[0]))]) 
+                if cycled == all_valid_skeletons[i]:
+                    check_pass = True
+                    break
+        if check_pass == False:
+            skeleton_classes.append(all_valid_skeletons[i])    
+#    print ("The skeleton classes are: ",skeleton_classes)   
+    return skeleton_classes
+    
+    
+    
+    
+##############################################################
+##### NAME : find_best_place_to_start_all_skeletons      #####
+##### IN   : b                                           #####
+#####        skeleton                                    #####
+#####        f_1                                         #####
+#####        k                                           #####
+##### OUT  : the skeleton list rotated for optimal start #####
+##############################################################
+def find_best_place_to_start_all_skeletons(b,skeleton,f_i,k): 
+    optimal_skeletons = []
+    for i in skeleton:
+        optimal_skeletons.append(find_best_place_to_start_one_skeleton(b,i,f_i,k))
+    return optimal_skeletons
+
+# We want to start the design's t_1 insertion whereever the most elements are in block 1
+# If this number is tied and they happen with the fewest losses between, we start with the earliest
+##############################################################
+##### NAME : find_best_place_to_start_one_skeleton       #####
+##### IN   : b                                           #####
+#####        skeleton                                    #####
+#####        f_1                                         #####
+#####        k                                           #####
+##### OUT  : the skeleton list rotated for optimal start #####
+##############################################################
+def find_best_place_to_start_one_skeleton(b,skeleton,f_i,k):    
+    num_of_var_in_block = generate_count_of_num_of_var_in_block(b,skeleton,f_i)  # Count the num of variables in each block      
+#    print "num_of_var_in_block :", num_of_var_in_block    
+    flag_of_good_starts = generate_flag_list(b,num_of_var_in_block,k)            # Find all where k or k-1 pos filled
+#    print "flag_of_good_starts :", flag_of_good_starts 
+    highest_run_count   = find_longest_run(b,skeleton,f_i,flag_of_good_starts)   # Find the  k / k-1 runs starting at each block
+#    print "highest_run_count   :", highest_run_count
+    sf_start_pos = find_highest_num(highest_run_count)                           # Find the longest k / k-1 run
+#    print "sf_start_position   :", sf_start_pos
+    rotated_skeleton = rotate_skeleton_to_best_start_pos(skeleton,sf_start_pos)  # rotate the skeleton to start at the longest run
+#    print "rotated_skeleton    :", rotated_skeleton
+    return rotated_skeleton 
+
+
+################################################################
+##### NAME : generate_count_of_num_of_var_in_block         #####
+##### IN   : b                                             #####
+#####        skeleton                                      #####
+#####        f_1                                           #####
+##### OUT  : a list of the num of var of f_1 in each block #####
+################################################################    
+def generate_count_of_num_of_var_in_block(b,skeleton,f_i):
+    # create a list to store the number of variables in each block
+    num_of_var_in_block = []
+    for i in range(b):
+        num_of_var_in_block.append(0) 
+    for i in range(b):
+        for j in range(f_i):
+            if 'S' in skeleton[(i-j)%b]:
+                num_of_var_in_block[i] += 1
+    return num_of_var_in_block
+
+
+
+#############################################################################
+##### NAME : generate_flag_list                                         #####
+##### IN   : b                                                          #####
+#####        num_of_var_in_block                                        #####
+#####        k                                                          #####
+##### OUT  : a list of flags indicating if a block is filled to k / k-1 #####
+#############################################################################
+def generate_flag_list(b,num_of_var_in_block,k):
+    # Each block that limits the number of elements outside of t_1 to 0 or 1 is flaged so it might move
+    # Don't need to worry about weather an S is in the SF array, since if we move the SF array start location
+    # to the begining of a run of this then we know an S will be present here
+    flag_of_good_starts = []
+    for i in range(b):
+        if num_of_var_in_block[i] == k or num_of_var_in_block[i] == (k-1):
+            flag_of_good_starts.append(1)
+        else :
+            flag_of_good_starts.append(0)       
+    return flag_of_good_starts
+
+
+##############################################################
+##### NAME : find_longest_run                            #####
+##### IN   : b                                           #####
+#####        skeleton                                    #####
+#####        f_1                                         #####
+#####        flag_of_good_starts (list)                  #####
+##### OUT  : a list of the lenght of runs for each block #####
+##############################################################    
+def find_longest_run(b,skeleton,f_i,flag_of_good_starts):
+    # find the begining of the longest run of k and (k-1) : (marked by a 1)
+    highest_run_count = [] # use this to figure out where the longest run is
+    for i in range(b):
+        highest_run_count.append(0)
+    for i in range(b):
+        for j in range(i,(i+b)):
+            if flag_of_good_starts[j%b] == 1:
+                highest_run_count[i] += 1
+            else:
+                break
+    return highest_run_count
+
+
+################################################################
+##### NAME : find_highest_num                              #####
+##### IN   : heighest_run_count                            #####
+##### OUT  : the starting position of the optimal skeleton #####
+################################################################
+def find_highest_num(highest_run_count):
+    # Find the largest number in the count
+    # we will shift the skeleton to start on it
+    start_pos = 0
+    start_num = 0
+    for i in range(len(highest_run_count)):
+        if highest_run_count[i] > start_num:
+            start_pos = i
+            start_num = highest_run_count[i]
+    return start_pos
+
+
+##############################################################
+##### NAME : rotate_skeleton_to_best_start_pos           #####
+##### IN   : skeleton                                    #####
+#####        sf_start_pos                                #####
+##### OUT  : the final rotated skeleton                  #####
+##############################################################    
+def rotate_skeleton_to_best_start_pos(skeleton,sf_start_pos):
+    # rotate the skeleton
+    rotated_skeleton = []
+    b = len(skeleton)
+    for i in range(b):
+        rotated_skeleton.append(skeleton[(i+sf_start_pos)%b])
+    return rotated_skeleton
+    
+
+
+
+############################################################################################
+##### NAME : build_var_of_all_potential_block_list_stage_1                             #####
+##### IN   : b - numb of blocks                                                        #####
+#####        skeleton (list of S,F,SF)                                                 #####
+#####        f_1                                                                       #####
+#####        k - block size                                                            #####
+##### OUT  : a list of all possible SF arrays filled in for every possible combination #####
+############################################################################################
+def build_var_of_all_potential_block_list_stage_1(b,skeleton,f_i,k,t_i):
+    completed_sf_arrays = []
+    list_of_skeleton_index = []
+
+    for i in skeleton:
+        ### First creat a uniform environment for the elements to be added to
+        sf_array = []  ###    block,#'s in block
+        curr_num_variables_in_block = []
+        for ii in range(b):
+            sf_array.append([])
+            curr_num_variables_in_block.append(0)
+            for j in range(k):
+                sf_array[ii].append("#")
+                
+        for ii in range(f_i[0]):
+            sf_array[ii][0] = 0
+            curr_num_variables_in_block[ii] += 1
+        desired_num_variables_in_block = generate_count_of_num_of_var_in_block(b,i,f_i[0])
+        curr_num_to_insert = 1 #the current nubmer we are adding
+        block_i = 1
+        if t_i[0] < k+1:
+            build_var_of_one_potential_block_list_stage_1_lesser_variation(b,i,f_i[0],k,block_i,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton.index(i),list_of_skeleton_index)
+        else :            
+            build_var_of_one_potential_block_list_stage_1(b,i,f_i[0],k,block_i,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton.index(i),list_of_skeleton_index)
+            
+    return_me = [completed_sf_arrays,list_of_skeleton_index]
+    return return_me
+         
+
+###################################################################################################
+##### NAME : build_var_of_one_potential_block_list_stage_1                                    #####
+##### IN   : b - block size                                                                   #####
+#####      : skeleton - a list of S,F positions                                               #####
+#####      : f_i (which is just f_1)                                                          #####
+#####      : k - size of the block                                                            #####
+#####      : block_i - the block we are currently on                                          #####
+#####      : sf_array - the work in progress                                                  #####
+#####      : curr_num - the curent element we want to add
+##### OUT  : complete list of one possible filled in SF arrays                                #####
+###################################################################################################
+# can i remove curr number of variables etc
+def build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k,block_i,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton_index,list_of_skeleton_index):
+   
+    #end condition
+    if block_i == b:
+        temp_design = []
+        temp_block  = []
+        for m in range(len(sf_array)):
+            temp_design.append([])
+            for n in range (len(sf_array[m])):
+                temp_design[m].append("")
+        for m in range(len(sf_array)):
+            for n in range(len(sf_array[m])):
+                temp_design[m][n] = sf_array[m][n]
+        completed_sf_arrays.append(temp_design)
+        list_of_skeleton_index.append(skeleton_index)       
+        return
+        
+    zero_present = False
+    if "S" in skeleton[block_i]:
+        
+        #first deal with the nice cases when we DO NOT LOOP
+        if (block_i+f_i) < b:
+            if block_i<f_i:
+                zero_present = True
+            for m in range(k):
+                if sf_array[block_i][m] == "#":
+                    for n in range(f_i):
+                        sf_array[block_i+n][m] = curr_num_to_insert                
+                    # IF 0 is in the block we can add other elements WLOG, we know where 0 ends so we use that 
+                    # so when 0 not in block we have to scann the block for multiple ok places to add
+                    if zero_present == False:
+                        build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k,block_i+1,sf_array, curr_num_to_insert+1,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+                        # if there is no 0 and we had updated and got back here we need to unupdate
+                        for n in range(f_i):
+                            sf_array[block_i+n][m] = "#"
+                    if zero_present == True:
+                        break # WILL TAKE US TO END OF M FOR LOOP. this way we don't overdue or undo our work.
+            if zero_present == True:
+                build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k,block_i+1,sf_array, curr_num_to_insert+1,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+        
+        #ELSE we have an element looping forsure
+        else:
+            # this is for the end of the design
+            for m in range(k):
+                if sf_array[block_i][m] == "#":
+                    for n in range(f_i):                        
+                        if block_i+n < b: # if we have NOT LOOPED yet
+                            sf_array[block_i+n][m] = curr_num_to_insert                
+                        elif (block_i+n) ==b: # we have looped
+                            # ONce an OKAY spot is found we set the flag that will then let us continue to the next block after changing apropriate positions
+                            for m2 in range(k):
+                                if sf_array[0][m2] == "#":
+                                    if sf_array[(block_i+f_i)%b][m2] == "#":
+                                        for n2 in range(n,f_i):
+                                            sf_array[(block_i+n2)%b][m2] = curr_num_to_insert                
+                                        build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k,block_i+1,sf_array,curr_num_to_insert+1,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+                                        for n2 in range(n,f_i):
+                                            sf_array[(block_i+n2)%b][m2] = "#"                                        
+                        else:
+                            break
+                    for n in range(f_i):
+                        # clear the stuff at the end of the design
+                        if block_i+n < b:
+                            sf_array[block_i+n][m] = "#"                        
+    
+    #else if "S" not present check next block    
+    else:
+        build_var_of_one_potential_block_list_stage_1(b,skeleton,f_i,k,block_i+1,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+        return    
+    return 
+
+###################################################################################################
+##### NAME : build_var_of_one_potential_block_list_stage_1_lesser_variation                   #####
+##### IN   : b - block size                                                                   #####
+#####      : skeleton - a list of S,F positions                                               #####
+#####      : f_i (which is just f_1)                                                          #####
+#####      : k - size of the block                                                            #####
+#####      : block_i - the block we are currently on                                          #####
+#####      : sf_array - the work in progress                                                  #####
+#####      : curr_num - the curent element we want to add
+##### OUT  : complete list of one possible filled in SF arrays                                #####
+###################################################################################################
+# can i remove curr number of variables etc
+###################################################################################################
+##### THIS LESSER VARIATION SHOULD ELIMINATE ISOMORPHIC CASES WHEN T_1 <= K
+###################################################################################################
+def build_var_of_one_potential_block_list_stage_1_lesser_variation(b,skeleton,f_i,k,block_i,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton_index,list_of_skeleton_index):   
+    #######################
+    ###  END CONDITION  ###
+    #######################
+    if block_i == b:              
+        temp_design = []
+        temp_block  = []
+        for m in range(len(sf_array)):
+            temp_design.append([])
+            for n in range (len(sf_array[m])):
+                temp_design[m].append("")
+        for m in range(len(sf_array)):
+            for n in range(len(sf_array[m])):
+                temp_design[m][n] = sf_array[m][n]
+        ############################
+        ### CHECK FOR ROW OF "#" ###
+        ############################
+        flag_empty_row = false      
+        for m in range(k):          
+            if temp_design[0][m] == "#":
+                for n in range(1,len(sf_array)):
+                    if temp_design[n][m] != "#":
+                        break       
+                    if n == len(sf_array)-1:
+                        flag_empty_row = true
+        ############################                  
+        #########################################################
+        ### COMPARE CURRENT BLOCK LIST TO PREVIOUS BLOCK LIST ###
+        #########################################################
+        ### If there was an empty row ?
+                            
+        #########################################################
+        completed_sf_arrays.append(temp_design)
+        list_of_skeleton_index.append(skeleton_index)
+        return        
+    zero_present = False
+    ################################
+    ###   WHEN "S" IS IN BLOCK   ###
+    ################################
+    if "S" in skeleton[block_i]:        
+        ############################
+        ###   CASE: NO LOOPING   ###
+        ############################
+        if (block_i+f_i) < b:
+            if block_i<f_i:
+                zero_present = True
+            for m in range(k):
+                if sf_array[block_i][m] == "#":
+                    for n in range(f_i):
+                        sf_array[block_i+n][m] = curr_num_to_insert                
+                    # IF 0 is in the block we can add other elements WLOG, we know where 0 ends so we use that 
+                    # so when 0 not in block we have to scann the block for multiple ok places to add
+                    if zero_present == False:
+                        build_var_of_one_potential_block_list_stage_1_lesser_variation(b,skeleton,f_i,k,block_i+1,sf_array, curr_num_to_insert+1,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+                        # if there is no 0 and we had updated and got back here we need to unupdate
+                        for n in range(f_i):
+                            sf_array[block_i+n][m] = "#"
+                    if zero_present == True:
+                        break # WILL TAKE US TO END OF M FOR LOOP. this way we don't overdue or undo our work.
+            if zero_present == True:
+                build_var_of_one_potential_block_list_stage_1_lesser_variation(b,skeleton,f_i,k,block_i+1,sf_array, curr_num_to_insert+1,completed_sf_arrays,skeleton_index,list_of_skeleton_index)        
+        ############################
+        ###   CASE: DEF LOOPING  ###
+        ############################    
+        else:
+            # this is for the end of the design
+            for m in range(k):
+                if sf_array[block_i][m] == "#":
+                    for n in range(f_i):
+                        ###################################
+                        ###  IF WE HAVE NOT LOOPED YET  ###
+                        ###################################                                            
+                        if block_i+n < b: 
+                            sf_array[block_i+n][m] = curr_num_to_insert                
+                        ###################################
+                        ###      IF WE HAVE LOOPED      ###
+                        ###################################                                            
+                        elif (block_i+n) ==b: # we have looped
+                            # ONce an OKAY spot is found we set the flag that will then let us continue to the next block after changing apropriate positions
+                            for m2 in range(k):
+                                if sf_array[0][m2] == "#":
+                                    if sf_array[(block_i+f_i)%b][m2] == "#":
+                                        for n2 in range(n,f_i):
+                                            sf_array[(block_i+n2)%b][m2] = curr_num_to_insert                
+                                        build_var_of_one_potential_block_list_stage_1_lesser_variation(b,skeleton,f_i,k,block_i+1,sf_array,curr_num_to_insert+1,completed_sf_arrays,skeleton_index, list_of_skeleton_index)
+                                        for n2 in range(n,f_i):
+                                            sf_array[(block_i+n2)%b][m2] = "#"  
+                                        break ### we are breaking here to illiminate a 2,3 swaping rows because we have at most k things in t_1, so 2,3 swaping at the start is isomorphic EFFICENCY                                      
+                        else:
+                            break
+                    for n in range(f_i):
+                        # clear the stuff at the end of the design
+                        if block_i+n < b:
+                            sf_array[block_i+n][m] = "#"                        
+    ##################################
+    ###  WHEN "S" IS NOT IN BLOCK  ###
+    ##################################
+    else:
+        build_var_of_one_potential_block_list_stage_1_lesser_variation(b,skeleton,f_i,k,block_i+1,sf_array,curr_num_to_insert,completed_sf_arrays,skeleton_index,list_of_skeleton_index)
+        return    
+    return 
+
+
+
+
+
+#######################################################
+##### NAME : print_skeleton_classes               #####
+##### IN   : equivalence_skeletons                #####
+##### OUT  : NA                                   #####
+#######################################################
+def print_equivalence_skeletons(equivalence_skeletons):
+    print ("The skeleton classes are: ")
+    for i in range (len(equivalence_skeletons)):
+        print (equivalence_skeletons[i])
+    return
+
+#######################################################
+##### NAME : print_optimal_skeletons              #####
+##### IN   : equivalence_skeletons                #####
+##### OUT  : NA                                   #####
+#######################################################
+def print_optimal_skeletons(optimal_skeletons):
+    print ("The optimal skeleton arangements are")
+    for i in range(len(optimal_skeletons)):
+        print (optimal_skeletons[i])
+    return
+
+###############################################################
+##### NAME : print_block_list_stage_1                     #####
+##### IN   :                                              #####
+##### OUT  : NA                                           #####
+###############################################################
+# prints by 
+def print_block_list_stage_1(all_potential_block_list_stage_1):
+    print ("The possible block lists at stage 1 are:")
+    for i in range (len(all_potential_block_list_stage_1)):
+        print_design(all_potential_block_list_stage_1[i])
+    return
+
+
+###############################################################
+#####
+###############################################################
+def print_design(scccd):
+    design_str = ""
+    b = len(scccd)
+    count = 0
+    for m in range(len(scccd[0])):
+        for block_i in range(len(scccd)):
+            design_str += "%4s"%(scccd[block_i][m]) + " "
+        design_str += "\n"
+    for m in range(len(scccd)):
+        temp_str = "B"+str(m)
+        design_str += "%4s"%(temp_str) + " "
+    design_str += "\n"
+    print(design_str)
+    
+    return 
+
+        
+#########################################################################
+##### NAME : generate_choice_list                                   #####
+##### IN   : t_i                                                    #####
+#####      : f_i                                                    #####
+##### OUT  : choice_list                                            #####
+#########################################################################
+    # This is a dictionary of valid options to creating the design. #
+    # Key   : Variable                                              #
+    # Value : [avaliable, max number allowed]                       #
+#########################################################################
+def generate_choice_list(t_i,f_i):
+    choice_list = {}
+    curr_element = t_i[0]
+    for k in range (1,len(t_i)):
+        if t_i[k] != 0:
+            for i in range (t_i[k]):
+                count = 0
+                for j in range (f_i[k]):
+                    count += 1
+                choice_list[curr_element] = [count,count]
+                curr_element += 1
+    print choice_list
+    return choice_list
+    
+#########################################
+##### NAME : generate_covering_dict #####
+##### IN   : v                      #####
+##### OUT  : covering_dict          #####
+#########################################
+def generate_covering_dict(v):
+    covering_dict = {}
+    for i in range (v):
+        covering_dict[i] = []
+    return covering_dict
+    
+##################################################
+##### NAME : add_covering                    #####
+##### IN   : curr_introduced                 #####
+#####      : x                               #####
+#####      : covering_dict                   #####
+##################################################
+def add_covering(x,curr_introduced,covering_dict):
+    temp = covering_dict[curr_introduced] 
+    temp.append(x)
+    temp.sort()
+    covering_dict[curr_introduced] = temp
+
+    temp = covering_dict[x]
+    temp.append(curr_introduced)
+    temp.sort()
+    covering_dict[x] = temp
+    return covering_dict
+
+###########################################
+##### NAME : delet_covering           #####
+##### IN   : curr_introduced          #####
+#####      : x                        #####
+#####      : covering_dict            #####
+###########################################
+def delet_covering(x,curr_introduced,covering_dict):
+    temp = covering_dict[curr_introduced] 
+#    print("First Value to be removed : ", x, "from dictionary: ", curr_introduced)
+#    print("List of values : ", temp)
+    temp.remove(x)
+    covering_dict[curr_introduced] = temp
+
+    temp = covering_dict[x]
+#    print("Second Value to be removed : " , curr_introduced, "from dictionary: ", x)
+#    print("List of values : ", temp)
+    temp.remove(curr_introduced)
+    covering_dict[x] = temp
+    return covering_dict
+
+#############################################
+##### NAME : check_if_already_covered   #####
+##### IN   : curr_introduced            #####
+#####      : x                          #####
+#####      : covering_dict              #####
+##### OUT  : boolean valid              #####
+#############################################
+def check_if_already_covered(x,curr_introduced,covering_dict):
+    if x in covering_dict[curr_introduced]:
+        return true
+    return false
+        
+###################################################
+##### NAME : check_if_new_point_exceeds_intro #####
+##### IN   : new_point                        #####
+#####      : intro_list                       #####
+#####      : intro_limit                      #####
+##### OUT  : Boolean                          #####
+###################################################
+def check_if_new_point_exceeds_intro(new_point,intro_list,intro_limit):  
+    if intro_list[new_point] >= intro_limit[new_point]:
+        return true
+    return false
+    
+###################################################
+##### NAME : check_if_new_point_exceeds_freq  #####
+##### IN   : new_point                        #####
+#####      : freq_list                        #####
+#####      : freq_limit                       #####
+##### OUT  : Boolean                          #####
+###################################################
+def check_if_new_point_exceeds_freq(new_point,freq_list,freq_limit):    
+    if freq_list[new_point] > freq_limit[new_point]:
+        return true
+    return false        
+
+
+
+
+
+###############################################################################
+#####                            OPTIMIZATION 1                           #####
+###############################################################################
+
+##### NAME : optimize_lower_number_introduced_first                        
+##### IN   : list_of_okay_starts                                          
+#####      : new_point                                                     
+#####      : equivalence_flag                                                
+#####      : pos_of_list_of_okay_starts                                          
+###############################################################################
+### Find the first place that the new point is smaller then the starts              
+### This means that the new point is in the t_i before this one.                  
+### So we can check if the new point is a valid option for that                   
+###      t_i or if we need to keep going to the next t_i                        
+### If we can not find such a place after the loop then we are in the            
+###      last t_i, so handle it                                                
+###############################################################################
+def optimize_lower_number_introduced_first(list_of_okay_starts,new_point,equivalence_flag,pos_of_list_of_okay_starts):    
+    for a in range(2,len(list_of_okay_starts),2):        
+        if new_point < list_of_okay_starts[a]:
+            if new_point <= (list_of_okay_starts[(a-1)]+1):
+                equivalence_flag = false # this is an okay start!
+                pos_of_list_of_okay_starts = (a-1)
+                return [equivalence_flag,pos_of_list_of_okay_starts]          
+    ### before we contine, we need to consider being in the last t_i as mentioned                     
+    if new_point >= list_of_okay_starts[-2]:
+        if new_point <= list_of_okay_starts[-1]+1:
+            equivalence_flag = false # since this is still unique
+            pos_of_list_of_okay_starts = -1    
+    return [equivalence_flag,pos_of_list_of_okay_starts]
+
+
+###############################################################################
+#####                            OPTIMIZATION 2                           #####
+###############################################################################
+##### NAME : optimization_2
+##### IN   : 
+#####      : 
+#####      : 
+#####      : 
+#####      : 
+#####      : 
+#####      : 
+##### OUT  : 
+#####                             
+#####                             
+###############################################################################
+#####         a  a  a  a
+#####         1  2* 3* 4*
+#####         b  b  b  b
+#####         c  c  c  c
+#####  make sure in a run of introductions of 3 or more that 2 comes before 3
+###############################################################################
+##### NO MODIFICATIONS FOR CIRCULAR : 
+#####   - since t_i does not mater for the first two introduction 
+#####       (its entering a leaving in on block) we dont need to check so 
+#####       make sure the lower number is introduced first
+###############################################################################
+##### Implimented when inserting a new introduced element
+#####  - Check the previous 3 blocks
+#####  - If they are all different 
+#####  - make sure block 3 > block 2
+#####  - if not - backtrack
+###############################################################################
+#def optimization_2(): # JUST DID THIS IN UPDATE():
+#    return
+
+
+
+###############################################################################
+#####                            OPTIMIZATION 3                           #####
+###############################################################################
+##### NAME : optimization_3
+##### IN   : v
+#####      : k
+#####      : sccd
+#####      : block_i
+#####      : covering_dict
+#####      : new_point
+#####      : pos                  - the element spot changing
+#####
+##### OUT  : True/False/Backtrack - did we make use of the optimization
+#####                             - if yes can we go forward error free
+#####                             - if we can not be error free then backtrack
+###############################################################################
+##### Opt 3 ensures x can not leave if it needs to cover less then k-1 elements
+##### See construcing tsccd(20,5) paper pg 404 top for more details
+###############################################################################
+##### MODIFICATIONS FOR CIRCULAR : 
+#####   - need to account for elements that wrap at the end of the design
+###############################################################################
+### NOTE WHEN I ELEMINATE PRINTING ELEMINATE COVERING_DICT HERE
+def optimization_3(v,k,scccd,block_i,covering_dict,new_point,pos,freq_list,list_of_elements_added,remaining_blocks_needed,intro_list,intro_limit,skeleton,freq_limit):   
+#    print ("We are checking into optimization 3")
+#    zz = 19 #for debugging 
+    flag = "false"    
+    ### USE THE ELEMENTS IN THE SKELETON TO SEE IF THE ELEMENT FORCED TO BE CARRIED FORWARD FURTHER
+    ### IF there is an "S" in the next block of the skeleton the block after it leaves then can not leave so we +1 to the foced block (k-1) becomes (k)
+    ### IF there is an "F" in the block of the skeleton where it stops, it can not leave and needs to be in the next block as well (k-1) becomes (k)
+    ### Remember that we can not have 3 "S" or "F" in a row by construction of SF-arrays
+#    extra_forced = 0
+#    if "F" in skeleton[block_i+remaining_blocks_needed]:        
+#        return "backtrack"
+    ##############################################
+    #####        CHECK FOR INTRO*(K-1)       #####
+    ##############################################       
+    remaining_introductions = intro_limit[new_point]-intro_list[new_point] 
+    if remaining_blocks_needed < (remaining_introductions*(k-1)):
+#        print ("WE FAIL because we need to cover "+str(remaining_blocks_needed)+" more pairs with the new point "+str(new_point)+" BUT we have "+str(remaining_introductions)+" introductions left")
+        return "backtrack"
+    ##############################################
+    #####        CHECK FOR FORCED K-1        #####
+    ##############################################        
+    ### THIS CHECKS IF THE REMAINING BLOCKS REQUIRED IS FORCED
+    if  remaining_blocks_needed < ((k-1)): # or freq_list[new_point]==freq_limit[new_point]:
+        if block_i+remaining_blocks_needed < len(scccd)-1:
+#            if block_i >= zz:
+#                print("WE ARE IN OPT 3")   
+#                print "list of elements added", list_of_elements_added
+#                print "len of cover dict ", len(covering_dict[new_point])
+#                print "covering dict is : ", covering_dict[new_point]
+            ##############################################
+            #####         CHECK INTRO LIMIT          #####
+            ##############################################    
+            ### NEED TO CHECK THE INTRODUCTION LIMIT IS CORRECT, it should be maxed out if we are forcing things forward
+            if intro_list[new_point] != intro_limit[new_point]:       
+                return "backtrack"
+            ##############################################
+            #####           CHECK FOR "S"            #####
+            ##############################################
+            ### NEED TO CHECK IF "S" is in the block following the forced and if so, is it in the same position
+            if block_i+remaining_blocks_needed+1< len(scccd):
+                if "S" in skeleton[block_i+remaining_blocks_needed+1]:
+                    for y in range(k):
+                        if scccd[block_i+remaining_blocks_needed][y] == new_point:
+                            if scccd[block_i+remaining_blocks_needed+1][y] != "#":    
+                                continue                                
+                            else:
+#                                if block_i >= zz:
+#                                    print ("Failed because something is forced to enter not following this position in the next block: block_i = "+str(block_i))
+#                                    print_design(scccd)
+                                return "backtrack"               
+            ##############################################
+            #####           CHECK FOR "F"            #####
+            ##############################################
+            ### NEED TO CHECK IF "F" is in the same block as the last forced, if so we can not end here
+            if "F" in skeleton[block_i+remaining_blocks_needed]:
+#                if block_i >= zz:
+#                    print ("FAILED because two things are trying to leave at once!, block_i = "+str(block_i))
+#                    print_design(scccd)
+                return "backtrack"
+            ############################################## !!! remove?
+            #####           CHECK FOR "#"            #####
+            ##############################################
+            ### NEED TO CHECK THAT WE CAN ADD THE POINT TO THE APPROPRIATE HOWEVER MANY BLOCKS
+            ### I think this might be remove removeable 
+            for y in range(remaining_blocks_needed):
+                if scccd[block_i+1+y][pos] != "#":
+#                    if block_i >= zz:
+#                        print ("FAILED because we require the new point "+str(new_point)+" to stay for the next "+str(remaining_blocks_needed)+" blocks.")
+#                        print ("However, there is a "+str(scccd[block_i+y][pos])+" in the way of this.")
+#                        print ("The length of the covering dic is "+str(len(covering_dict[new_point])))
+                    return "backtrack"                
+            ##############################################
+            #####       UPDATE SUBSEQUENT BLOCKS     #####
+            ##############################################
+            ### PASSES THE CONDITIONS OF BEING FORCED FOR THE NEXT k-1 BLOCKS
+            flag = "true" # now do the update
+            for y in range(1,remaining_blocks_needed+1):
+#                print ("We are using optimization 3 in the update_single_element function")
+                scccd[block_i+y][pos] = new_point
+                freq_list[new_point] += 1
+                list_of_elements_added.append(new_point)                                          
+#    print ("list_of_elements_added update opt 3: "+str(list_of_elements_added))
+    return flag
+    
+###############################################################################
+#####                      OPTIMIZATION 3 un_update                       #####
+###############################################################################
+##### NAME : optimization_3_un_update
+##### IN   : v
+#####      : k
+#####      : sccd
+#####      : block_i
+#####      : covering_dict
+#####      : new_point
+###############################################################################    
+def optimization_3_un_update(v,k,scccd,block_i,covering_dict,new_point,pos,remaining_blocks_needed,freq_list,list_of_elements_added):
+    ### y == 0 is taken care of in un_update_s_e()
+    for y in range(1,remaining_blocks_needed+1): 
+        scccd[block_i+y][pos] = "#"
+        freq_list[new_point] -= 1
+        del list_of_elements_added[-1]    
+#    print ("list_of_elements_added un_update_opt 3: "+str(list_of_elements_added))
+    return
+
+
+#########################################
+###           OPTIMIZATION 5          ###
+#########################################   
+# We return true in opt 5 if we did already cover a pair
+# We return false in opt 5 if we did not cover the new point 
+#   with any in the unchanged subset        
+#############################################################################################
+# CHECKS UNCHANGED SUBSET FROM PREV                                                       ### 
+# Old code used to check the current block                                                ###
+# However, the old code did not keep element positions!                                   ###
+# Therefore, we know the unchanged subset when we introduce the new point at the new_pos  ###
+# We need to move this to the update function though to know the correct unchanged subset ###
+#############################################################################################
+##def optimization_5(k,scccd,block_i,covering_dict,new_point,new_pos):
+#    print("USING OPTIMIZATION 5")
+#    print "covering_dict[new_point] is :", covering_dict[new_point]
+##    for a in range(k):
+##        if a != new_pos:
+#            print("compairing " +str(new_point)+" and "+str(scccd[block_i-1][a]))
+#            print "covering_dict[scccd[block_i-1][a]] is of element "+str(scccd[block_i-1][a])+" is: ", covering_dict[scccd[block_i-1][a]]
+##            if (check_if_already_covered(new_point,scccd[block_i-1][a],covering_dict) ) == true : 
+##                print(" We already covered the pair ("+str(new_point)+","+ str(a) + ") with new point "+ str(new_point)+ ", so move on to the next")    
+##                return true
+##    return false
+    
+
+###########################################
+##### NAME : update                   #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+#####      : 
+#####      : 
+#####      : 
+########################################### NOTE Not updated with the new stuff yet
+def update(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added, list_of_okay_starts,new_point, pos_of_list_of_okay_starts,skeleton):
+#    print "NEW POINT IS CURRENTLY ", new_point
+#    zz = 19 # for printing debugging purposes 
+    #########################################
+    ###           OPTIMIZATION 5          ###
+    ######################################### 
+    # list_of_okay_new_intro_positions  is used to keep track of the positions we actually can use to insert a new point
+    # list_of_okay_new_point_positions  is used to keep track of where the #'s are
+    # This is what allows us to utilize optimization 5     
+    list_of_okay_new_intro_positions = []
+    list_of_okay_new_point_positions = [] 
+    #1) Find a forced introduction location if possible
+    if "F" in skeleton[block_i-1]: 
+        for x in range (k):
+            if scccd[block_i][x] != scccd[block_i-1][x]:
+                if scccd[block_i-1][x] < t_i[0]:                   
+                    list_of_okay_new_intro_positions.append(x)
+                    break
+    #2) Find all "#" positions
+    for x in range (len(scccd[block_i])): 
+        if scccd[block_i][x] == "#": 
+            list_of_okay_new_point_positions.append(x)                
+#    if list_of_okay_new_point_positions == [] : # redundant?
+#        return
+    #3) If no new_intro_position is forced, then intro can happen whereever a "#" exists
+    if list_of_okay_new_intro_positions == []:
+        list_of_okay_new_intro_positions = list_of_okay_new_point_positions
+    
+#    if block_i >= zz:
+#        print("list_of_okay_new_intro_positions = "+str(list_of_okay_new_intro_positions))
+#        print("list_of_okay_new_point_positions = "+str(list_of_okay_new_point_positions))
+    
+    #4) Do the updates for increasing
+    #################################################################################################
+    #####                     EVERYTHING THAT NEEDS TO INCREASE                                 #####
+    #################################################################################################
+    ### flag_list_okay_starts_increase is used to track weather or not optimization 1's tracker #####
+    ### should go up, if we don't monitor every time a element is added the tracker goes up, so #####
+    ### elements will add before they should ########################################################             
+    flag_list_okay_starts_increase = false ##########################################################  
+    if list_of_okay_starts[pos_of_list_of_okay_starts] < new_point: #################################
+        list_of_okay_starts[pos_of_list_of_okay_starts]+=1 ##########################################
+        flag_list_okay_starts_increase = true  ######################################################
+    intro_list[new_point] += 1  # increases the numb of times the new element is introduced #########
+    freq_list[new_point]  += 1   # increases the frequence count of new element #####################  
+    list_of_elements_added.append(new_point) ########################################################
+    list_of_introductions.append(new_point) #########################################################
+    #################################################################################################
+    #5) For any new_introduction position 
+    for x in list_of_okay_new_intro_positions:#        if scccd[block_i][x] == "#":    # this is checked in opt 5 above   
+#        if block_i >= zz:
+#            print ("WE ARE SEARCHING ON POSITION "+str(x)+ " FOR THIS ITERATION!")      
+        #########################################
+        ###           OPTIMIZATION 2          ###
+        #########################################
+        ### MINOR VARIENTS #a)
+        #########################################
+        if new_point != scccd[block_i-1][x]:
+            if (block_i > 2) and (block_i < len(scccd)-2):
+                if scccd[block_i-1][x] != scccd[block_i-2][x]:
+                    if scccd[block_i-2][x] != scccd[block_i-3][x]:
+                        if scccd[block_i-2][x] > scccd[block_i-1][x]:
+                            continue
+                            ################################################
+                            ##### NEED TO MAKE SURE THAT NONE OF THE ELEMENTS WE ARE DEALING WITH ARE IN BLOCK 0
+                            ################################################
+    #                        if (scccd[block_i-1][x] not in scccd[0]):
+    #                            if (scccd[block_i-2][x] not in scccd[0]):
+    #                                if (scccd[block_i-3][x] not in scccd[0]):
+    #                                    if block_i >= zz:
+    #                                        print("we are failing on the minor varients")
+    #                                        continue        
+    
+        #######################################################
+        ### Check the unchanged subset #b)
+        #######################################################
+        flag_unchanged_subset_repeat = false
+        for ii in range(k): #scccd[block_i-1]:
+            if ii != x:
+                if (scccd[block_i-1][ii] == new_point):
+#                    if block_i >= zz:
+#                        print("fail because we are going to carry over the introduced element at position "+str(x)+" : "+str(new_point))
+#                        print_design(scccd)
+                    flag_unchanged_subset_repeat = true
+                    break
+                if (check_if_already_covered(scccd[block_i-1][ii],new_point,covering_dict) == true):
+#                    if block_i >= zz:
+#                        print("fail because already covered when checking the unchanged subset from new position "+str(x)+" : new_point="+str(new_point)+" old_point="+str(scccd[block_i-1][ii]))
+#                        print_design(scccd)
+                    flag_unchanged_subset_repeat = true
+                    break
+        if flag_unchanged_subset_repeat == true:
+            continue
+        #######################################################
+        ### Check that new_point does not need leave when  #c)
+        ### something in t_1 must (Before being forced forward)   
+        #######################################################
+        # NOTE : new_point_rem_block_needed is poorly named its number of pairs remaining to be covered! 
+        new_point_rem_block_needed = (v-len(covering_dict[new_point])-k) # we have not added to the covering dict yet, so -k ( n cant 
+        new_point_rem_intro = intro_limit[new_point]-intro_list[new_point] # remaining introductions      
+        forward_forced = 0
+        flag_new_point_pushed_to_break = false
+        if "F" in skeleton[block_i]:
+            forward_forced += 1
+        for ii in range(block_i+1,len(skeleton)-1): 
+#            if block_i >= zz:
+#                print ("ii in SF check is hapening : block" +str(ii)) 
+            if "SF" in skeleton[ii]:
+                if scccd[ii][x] != "#": # enough to check "#" because if any number is here it would be from t_0. so it ends
+#                    if block_i >= zz :
+#                        print ("BREAKING IN SF")
+                    break  
+                else: # else it sticks around past this nonsence and stays for 2 blocks
+                    if "F" in skeleton[ii-1]:
+                        forward_forced += 1
+                    else:
+                        forward_forced += 2 # due to the "S" and "F"
+            elif "S" in skeleton[ii]:
+                if scccd[ii][x] != "#": # enough to check "#" because if any number is here it would be from t_0 
+                    #flag_new_point_pushed_to_break = true
+#                    if block_i >= zz:
+#                        print ("BREAKING IN S")
+                    break 
+                else:
+                    forward_forced += 1 # due to the "S" 
+            elif "F" in skeleton[ii] and "F" in skeleton[ii-1]:
+                forward_forced += 1 # due to the "F" 
+            else:
+#                if block_i >= zz:
+#                    print ("breaking in F")
+                break
+        if flag_new_point_pushed_to_break == true:
+            continue
+        if intro_limit[new_point]!=intro_list[new_point]:
+            if new_point_rem_block_needed-forward_forced < (new_point_rem_intro*(k-1)):  
+#                if block_i >= zz:    
+#                    print ("failed because we cant get the required introductions placing here: element "+str(new_point))
+                continue
+        #######################################################
+        ###               OPTIMIZATION 3  #d)               ### 
+        #######################################################
+        remaining_blocks_needed = (v-len(covering_dict[new_point])-k)     ### -1 because we dont have x see x & +1 recount the "#" we are replacing in a moment
+        flag_optimize_3 = optimization_3(v,k,scccd,block_i,covering_dict,new_point,x,freq_list,list_of_elements_added,remaining_blocks_needed,intro_list,intro_limit,skeleton,freq_limit)     
+        if flag_optimize_3 == "backtrack": 
+#            if block_i >= zz:
+#                print ("opt 3 made us backtrack")              
+            continue                         
+
+        #######################################################
+        ### Push forward the unchanged subset where possible
+        ####################################################### <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        flag_carry_over_breaks_forced_unchanged_subset = false
+#        print "block of scccd before: ", scccd[block_i]
+        ### Dict is set up so that the index is the position in the block and the look up will be the number of blocks its forced to stay if its forced.
+        ### Ex. the "3" in position 0 in block must stay for 2 more blocks.
+        remaining_blocks_needed_unchanged_subset_dict  = {}
+        for ii in list_of_okay_new_point_positions:
+            ### Make sure that ii is not the current position!
+            if ii == x:
+                continue                            
+            ##############################################                                  
+            ### check freqency is okay # might not need when others are in place CHECK THIS !!!
+            if freq_list[scccd[block_i-1][ii]] > freq_limit[scccd[block_i-1][ii]]: ## can i get rid of this check?
+#                if block_i >= zz:
+#                    print ("FAIL because the unchanged subset being forced exceeds the frequency limit of element "+str(scccd[block_i-1][ii]))
+#                    print_design(scccd)
+                continue
+            ### is it forced to stay for k-1 blocks / can it stay opt 3 / this is a little different - write an opt 3 for unchanged subsets
+            remaining_blocks_needed_unchanged_subset = (v-len(covering_dict[scccd[block_i-1][ii]])-2)# -1 for element - 1 for new_point
+            if remaining_blocks_needed_unchanged_subset  < 0:# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< if we already have covering full then (-)ve num occur
+#                if block_i <= zz:
+#                    print("remaining_blocks_needed_unchanged_subset  < 0")
+                continue
+            remaining_introductions_unchanged_subset_element = intro_limit[scccd[block_i-1][ii]]-intro_list[scccd[block_i-1][ii]] 
+#            if block_i >= zz:
+#                strg = "The covering dict for the point "+str(scccd[block_i-1][ii])+" is "+str(covering_dict[scccd[block_i-1][ii]])
+#                strg += "\nThe remaining blocks needed for element "+str(scccd[block_i-1][ii])+" of the unchanged subset is "+str(remaining_blocks_needed_unchanged_subset)
+#                strg += "\nThe remaining introductions required for element "+str(scccd[block_i-1][ii])+" is "+str(remaining_introductions_unchanged_subset_element)
+#                print(strg)
+            forced_forward = 0
+            ##############################################
+            ###       CHECK "F" IN CURRENT BLOCK       ###
+            ##############################################
+            if "F" in skeleton[block_i]:
+                forced_forward +=1
+            for aa in range(block_i+1,len(skeleton)-1) : 
+#                if block_i >= zz:
+#                    print (" in the F SF S F check we are on aa"+str(aa))
+                ##############################################
+                ###      CHECK "SF" IN NEXT BLOCK          ###
+                ##############################################
+                if "SF" in skeleton[aa]:
+                    # we check if "F" was in the prev block, because if it was the "S" here would follow it. IF NOT then S can follow a number here and it CAN end
+                    if (scccd[aa][ii] != "#"):  # if not "#" here it would be from t_1 or forced foarward                       
+                        break # the element stops here
+                    else:
+                        # If "F" in prev block it was already forced to continue to this block so the "S" in the "SF" means nothing, only add 1 due to "F"
+                        if "F" in skeleton[aa-1]:
+                            forced_forward += 1
+                        else: 
+                            forced_forward += 2
+                ##############################################
+                ###       CHECK "S" IN NEXT BLOCK          ###
+                ##############################################
+                elif "S" in skeleton[aa]:
+                    if (scccd[aa][ii] != "#"): # if not "#" here it would be from t_1 or forced foarward                   
+                        break # the element stops here
+                    else :
+                        forced_forward += 1
+                ##############################################
+                ###       CHECK "F" IN NEXT BLOCK          ### THIS SAYS NOTHING AND IS WRONG!
+                ##############################################
+                elif "F" in skeleton[aa] and "F" in skeleton[aa-1]:
+                    forced_forward += 1
+                ##############################################
+                ###     ELSE NOTHING TO FORCE FORWARD      ###
+                ##############################################
+                else:
+                    break
+            if (remaining_blocks_needed_unchanged_subset-forced_forward < (remaining_introductions_unchanged_subset_element*(k-1)) ):  
+                if remaining_blocks_needed_unchanged_subset < (k-1): # dont check freq, since it was already introduced and checked then
+                    if intro_list[scccd[block_i-1][ii]] == intro_limit[scccd[block_i-1][ii]]:
+                        if block_i+remaining_blocks_needed_unchanged_subset+1< len(scccd)-1: ###2
+                            ##############################################
+                            #####           CHECK FOR "#"            #####
+                            ##############################################
+                            ### NEED TO CHECK THAT WE CAN ADD THE POINT TO THE APPROPRIATE HOWEVER MANY BLOCKS
+                            # THIS IS REDUNDANT FROM PREVIOUS CHECK? -> ANS: NO since we dont check, we only count? 
+                            for aa in range(remaining_blocks_needed_unchanged_subset+forced_forward):
+                                if scccd[block_i+aa+1][ii] != "#":
+#                                    if block_i >= zz:
+#                                        print ("FAILED because  a number is in the way of whats forced from unchanged subset: element " +str(scccd[block_i-1][ii]))
+#                                        print_design(scccd)
+                                    flag_carry_over_breaks_forced_unchanged_subset = true
+                                    continue                        
+                            ##############################################
+                            #####           CHECK FOR "S"            #####
+                            ##############################################
+                            ### NEED TO CHECK IF "S" is in the block following the forced and if so, is it in the same position                        
+                            if "S" in skeleton[block_i+remaining_blocks_needed_unchanged_subset+1]: ###2
+                                for y in range(k):
+                                    if scccd[block_i+remaining_blocks_needed_unchanged_subset][y] == new_point: ### not quite wright ###2
+                                        if scccd[block_i+remaining_blocks_needed_unchanged_subset+1][y] < t_i[0]: ###2
+                                            continue
+                                        else:
+#                                            if block_i >= zz:
+#                                                print ("FAILED because something is forced to enter not following this position in the next block : element" +str(scccd[block_i-1][ii]))
+#                                                print_design(scccd)
+                                            flag_carry_over_breaks_forced_unchanged_subset = true
+                                            continue               
+                            ##############################################
+                            #####           CHECK FOR "F"            #####
+                            ##############################################
+                            ### NEED TO CHECK IF "F" is in the same block as the last forced, if so we can not end here
+                            if "F" in skeleton[block_i+remaining_blocks_needed_unchanged_subset]: ###2
+#                                if block_i >= zz:
+#                                    print ("FAILED because two things are trying to leave at once! : element" +str(scccd[block_i-1][ii]) +" : new_point "+str(new_point))
+#                                    print_design(scccd)
+                                flag_carry_over_breaks_forced_unchanged_subset = true
+                                continue             
+                            remaining_blocks_needed_unchanged_subset_dict[ii] = remaining_blocks_needed_unchanged_subset 
+                    else:
+#                        if block_i >= zz:
+#                            strg = "FAILED because we dont have the right intro limit while forcing an element in the unchanged subset forward due to pair requirements : element"+str(scccd[block_i-1][ii])
+#                            strg +=  " : new_point "+str(new_point)                       
+#                            print(strg)
+#                            print_design(scccd)
+                        flag_carry_over_breaks_forced_unchanged_subset = true
+                        continue
+                else:
+#                    if block_i >= zz:
+#                        strg = "\nii = "+str(ii)+" : x = "+str(x)
+#                        strg += "FAILED because we will not be able to complete the introductions, not enough pairs left involving "+str(scccd[block_i-1][ii])+": "
+#                        strg += str(remaining_blocks_needed_unchanged_subset-forced_forward)
+#                        strg +=" < " + str(remaining_introductions_unchanged_subset_element) +"*"+str(k-1) +" : remaining_introductions_unchanged_subset_element = "
+#                        strg += str(remaining_introductions_unchanged_subset_element)
+#                        print (strg)
+#                        print_design(scccd)
+#                        print (" with new_point "+str(new_point)+" in position "+str(ii)+" currently updating in block "+str(block_i)+"\n")
+                    flag_carry_over_breaks_forced_unchanged_subset = true
+                    continue
+        ##########################################
+        ### Make sure we did not break the introduction limit above with our flag
+        ##########################################
+        if flag_carry_over_breaks_forced_unchanged_subset == true:
+            ### REMOVE THE EXTRA FORCED K-1 POINTS of introduced element that we skip by opps if we break here                          
+            if flag_optimize_3 == "true":
+#                if block_i >= zz:
+#                    print("optimize 3 is a go")
+                optimization_3_un_update(v,k,scccd,block_i,covering_dict,new_point,x,remaining_blocks_needed,freq_list,list_of_elements_added) 
+            continue            
+        ##########################################
+        ### push the unchanged subset forward after making sure we got  
+        ### WE CAN NOT move this up and ittr less, because we would have to undo what we did if there was something that broke it
+        ##########################################
+        for key in remaining_blocks_needed_unchanged_subset_dict:
+            if key != x:
+                for remaining_blocks_needed_unchanged_subset in range(remaining_blocks_needed_unchanged_subset_dict[key]):
+                    scccd[block_i+1+remaining_blocks_needed_unchanged_subset][key] = scccd[block_i-1][key]
+                freq_list[scccd[block_i-1][key]] += remaining_blocks_needed_unchanged_subset_dict[key]   
+#                print("Adding "+str(remaining_blocks_needed_unchanged_subset_dict[key])+" to the freq_list of "+str(scccd[block_i-1][key]))      
+        #######################################################
+        scccd[block_i][x] = new_point         
+        #######################################################
+        #######################################################
+        ###        CARRY OVER THE UNCHNAGED SUBSET          ###
+        #######################################################
+        for ii in list_of_okay_new_point_positions:
+            if ii != x: 
+                scccd[block_i][ii] = scccd[block_i-1][ii]
+                freq_list[scccd[block_i][ii]]+=1
+#        print "block of scccd after : ", scccd[block_i]
+        ### ADD Covering 
+        for ii in scccd[block_i]:
+            if ii != new_point:
+                add_covering(ii,new_point,covering_dict)
+        ### FOR DEBUGING 
+#        for ii in scccd[block_i]:
+#            print ("The covering at the update for element: "+str(ii)+" is "+str(covering_dict[ii]))
+        ################################################
+        ######           PRINTING UPDATE           #####
+        ################################################
+#        if block_i >= zz:
+#            print ("\nUPDATED SCCCD (vanilla):")
+#            print_design(scccd)
+#        print ("INTROduction LIST NOW:  " + str(list_of_introductions)+     "\nlist of elements added: " + str(list_of_elements_added)+"\n")
+#        print ("freq_lists for above design are now:")
+#        for ii in range(v):
+#            ii_count = 0
+#            for cc in range(len(scccd)):
+#                for dd in range(k):
+#                    if scccd[cc][dd] == ii:
+#                        ii_count += 1
+#            print ("freq_list[" +str(ii)+ "] is "+str(freq_list[int(ii)])+" : "+str(ii_count)+" actual count in design")
+        ################################################
+        #####              RECURSION               #####
+        ################################################
+        recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i+1,type,t_i,found_designs, list_of_elements_added,list_of_okay_starts,skeleton)
+#        print("we could not add "+str(new_point)+" into postion "+str(x)+" in block "+str(block_i))
+        ################################################
+        #####      UN-UPDATE ON POSITION HERE      #####
+        ################################################
+        ### REMOVE THE UNCHANGED SUBSET PUSHED FORWARDS
+        for key in remaining_blocks_needed_unchanged_subset_dict:
+            if key != x:
+#                print("removing "+str(remaining_blocks_needed_unchanged_subset_dict[key])+" to the freq_list of "+str(scccd[block_i-1][key]))           
+                freq_list[scccd[block_i][key]] -= remaining_blocks_needed_unchanged_subset_dict[key]         
+                for remaining_blocks_needed_unchanged_subset in range(remaining_blocks_needed_unchanged_subset_dict[key]):                    
+                    scccd[block_i+1+remaining_blocks_needed_unchanged_subset][key] = "#"
+        ### DELETE COVERING 
+        for ii in scccd[block_i]:
+            if ii != new_point:
+                delet_covering(ii,new_point,covering_dict)                
+        ### REMOVE FREQUENCY AND ADD "#" for current block 
+        for ii in list_of_okay_new_point_positions: 
+            if ii != x:
+                freq_list[scccd[block_i][int(ii)]] -= 1
+                scccd[block_i][ii] = "#" 
+        ### REMOVE THE EXTRA FORCED K-1 POINTS of introduced element                         
+        if flag_optimize_3 == "true":
+            optimization_3_un_update(v,k,scccd,block_i,covering_dict,new_point,x,remaining_blocks_needed,freq_list,list_of_elements_added) 
+        #######################################################
+        scccd[block_i][x] = "#"
+        ####################################################### 
+    ################################################
+    #####       UN-UPDATE NEW POINT HERE       #####
+    ################################################
+    ### REMOVE NEW POINT INFORMATION   
+    intro_list[new_point] -= 1
+    freq_list[new_point]  -= 1  
+    if flag_list_okay_starts_increase == true:      
+        list_of_okay_starts[pos_of_list_of_okay_starts] -= 1  
+    del list_of_elements_added[-1]
+    del list_of_introductions[-1]
+    ################################################
+    #####          PRINTING UN-UPDATE          #####
+    ################################################
+#    if block_i >= zz:
+#        print("\nUN-UPDATED SCCCD (vanilla):")
+#        print_design(scccd)
+    return 
+        
+
+
+###########################################
+##### NAME : update_no_new_point_first_block      #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+#####
+###########################################
+def update_no_new_point_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,intro_limit,freq_limit,type,t_i,found_designs,list_of_elements_added, list_of_okay_starts,skeleton):
+    list_of_okay_new_point_positions = []  # so we know where to add and remove                     
+    ### ADD COVERING BLOCK 0     
+    for x in scccd[block_i]:                                              
+        if x != new_point:                                                
+            if x != "#": #design will now always be full by this point    
+                add_covering(x,new_point,covering_dict)                               
+    ### ADD INFO ON NEW POINT
+    intro_list[new_point] += 1
+    freq_list[new_point] += 1
+    ###########################################
+    #####        PRINTING UPDATE          #####
+    ###########################################    
+#    print ("UPDATED SCCCD (no new point) :")
+#    print_design(scccd)
+#    print ("INTRO LIST NOW: ", list_of_introductions)
+    ###########################################
+    #####          RECURSION              #####
+    ###########################################
+    if ("#" not in scccd[block_i] ):
+#        print ("# is not present in the current block; continuing to the next block.")
+        recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,(block_i+1),type,t_i,found_designs,list_of_elements_added,list_of_okay_starts,skeleton)
+    else:
+#        print("# is in the block still, so we continuing updating the current block.")
+        recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,(block_i),type,t_i,found_designs,list_of_elements_added,list_of_okay_starts,skeleton)
+#    un_update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point)
+    ###########################################
+    #####         UN UPDATE HERE          #####
+    ###########################################
+    ### REMOVE COVERING BLOCK 0 
+    for x in scccd[block_i]:   
+        if x != "#":                                                      
+            if x != new_point:                                            
+                delet_covering(x,new_point,covering_dict)                     
+    ### REMOVE INFO ON NEW POINT        
+    intro_list[new_point] -= 1
+    freq_list[new_point] -= 1
+    ###########################################
+    #####       PRINTING UN-UPDATE        #####
+    ###########################################
+#    print ("")            
+#    print ("UN-UPDATED SCCCD (no new point):")
+#    print_design(scccd)
+#    print ("INTROduction LIST NOW: ", list_of_introductions)
+    return 
+    
+###########################################
+##### NAME : update_no_new_point      #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+#####
+###########################################
+def update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,intro_limit,freq_limit,type,t_i,found_designs,list_of_elements_added, list_of_okay_starts,skeleton):
+#    zz = 19 #for debuging
+    #########################################
+    ###           OPTIMIZATION 2          ###
+    #########################################
+    ### MINOR VARIENTS #a)
+    #########################################
+    ### In theis one we know that new_point is not in the prev block, so we need not check 
+    position = scccd[block_i].index(new_point)
+    if (block_i > 2) and (block_i < len(scccd)-2):
+            if scccd[block_i-1][position] != scccd[block_i-2][position]:
+                if scccd[block_i-2][position] != scccd[block_i-3][position]:
+                    if scccd[block_i-2][position] > scccd[block_i-1][position]:
+                        return
+    list_of_okay_new_point_positions = []  # so we know where to add and remove       
+    for x in range(len(scccd[block_i])):
+        if x != scccd[block_i].index(new_point):
+            if check_if_already_covered(scccd[block_i-1][x],new_point,covering_dict) == true:
+#                print ("An element that was forced to be added hear due to Optimization 3 can not be hear, so backtrack!")
+                return
+    ### FIND OUT WHERE THE "#" ARE
+    for x in range(len(scccd[block_i])):
+        if scccd[block_i][x] == "#":
+            list_of_okay_new_point_positions.append(x)    
+    ### ADD UNCHNAGED SUBSET CARRY-OVER
+#    print "list_of_okay_new_point_positions :", list_of_okay_new_point_positions
+    for x in list_of_okay_new_point_positions:
+#        print "on x in list_of_okay_new_point_positions :", x
+#        if x != scccd[block_i].index(new_point): # dont have to check new_point since it was not introduced here
+        scccd[block_i][x] = scccd[block_i-1][x]
+        freq_list[scccd[block_i][x]] += 1                
+    ### ADD COVERING (NOT BLOCK 0)
+    for x in scccd[block_i]:
+        if x != new_point:
+            add_covering(x,new_point,covering_dict)                    
+    ### ADD INFO ON NEW POINT
+    intro_list[new_point] += 1
+    freq_list[new_point] += 1
+    ###########################################
+    #####        PRINTING UPDATE          #####
+    ########################################### 
+#    if block_i >= zz:
+#        print ("UPDATED SCCCD (no new point) :")
+#        print_design(scccd)
+#        print ("INTRO LIST NOW: ", list_of_introductions)
+    ###########################################
+    #####          RECURSION              #####
+    ###########################################
+    recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,(block_i+1),type,t_i,found_designs,list_of_elements_added,list_of_okay_starts,skeleton)
+    ###########################################
+    #####         UN UPDATE HERE          #####
+    ###########################################
+    ### REMOVE COVEREING ANY OTHER BLOCK (NOT BLOCK 0) 
+    for x in scccd[block_i]:
+        if x != new_point:
+            delet_covering(x,new_point,covering_dict)
+    ### REMOVE THE UNCHANGED SUBSET CARRY-OVER
+    for x in list_of_okay_new_point_positions:
+        freq_list[scccd[block_i][x]] -= 1
+        scccd[block_i][x] = "#"
+    ### REMOVE INFO ON NEW POINT        
+    intro_list[new_point] -= 1
+    freq_list[new_point] -= 1
+    ###########################################
+    #####       PRINTING UN-UPDATE        #####
+    ###########################################
+#    print ("")            
+#    print ("UN-UPDATED SCCCD (no new point):")
+#    print_design(scccd)
+#    print ("INTROduction LIST NOW: ", list_of_introductions)
+    return 
+        
+###########################################
+##### NAME : un_update_no_new_point   #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+###########################################
+def un_update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point):
+    intro_list[new_point] -= 1
+    freq_list[new_point] -= 1
+    for x in scccd[block_i]:
+        #### NEED "#" Just in case first block of design is not full! ###
+        if x != new_point and x != "#":       
+            delet_covering(x,new_point,covering_dict)
+#    print ("")            
+#    print ("UN-UPDATED SCCCD (no new point):")
+#    print_design(scccd)
+#    print ("INTROduction LIST NOW: ", list_of_introductions)
+    return 
+    
+
+
+############################################################
+##### NAME : update_single_element_first_block         #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+#####
+#####
+###########################################
+def update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added, list_of_okay_starts,new_point, pos_of_list_of_okay_starts,skeleton):
+#def update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,list_of_elements_added,list_of_okay_starts,pos_of_list_of_okay_starts):
+    ### flag_list_okay_starts_increase is used to track weather or not optimization 1's tracker
+    ### should go up, if we don't monitor every time a element is added the tracker goes up, so
+    ### elements will add before they should
+    flag_list_okay_starts_increase = false 
+    
+    for x in range (len(scccd[block_i])):
+        if scccd[block_i][x] == "#":
+            scccd[block_i][x] = new_point
+#            break
+            ### remember that 6 is introduced in the last block or earlier in a run, so we dont introduce here!
+            ### Dont increase the introduction rate here!, its introduced else where
+            freq_list[new_point] += 1   # increases the frequence count of new element
+            if list_of_okay_starts[pos_of_list_of_okay_starts] < new_point:
+                list_of_okay_starts[pos_of_list_of_okay_starts] += 1
+                flag_list_okay_starts_increase = true       
+            add_covering(list_of_introductions[-1],new_point,covering_dict)
+            list_of_elements_added.append(new_point)
+        #    print ("UPDATED SCCCD (vanilla - first block special):")
+        #    print_design(scccd)
+        #    print ("INTROduction LIST NOW: ", list_of_introductions)
+        #    print ("list of elements added: ", list_of_elements_added)
+            
+            
+            
+        #    print_design(scccd)
+            if "#" in scccd[block_i]:
+                recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i,found_designs, list_of_elements_added,list_of_okay_starts,skeleton)       
+            else:
+                recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i+1,type,t_i,found_designs, list_of_elements_added,list_of_okay_starts,skeleton)
+            un_update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,list_of_elements_added,list_of_okay_starts)
+            ### OPTIMIZATION 1
+            if flag_list_okay_starts_increase == true:
+                list_of_okay_starts[pos_of_list_of_okay_starts] -= 1  
+
+    return 
+    
+###########################################
+##### NAME : un_update_single_element_first_block     #####
+##### IN   : v                        #####
+#####      : k                        #####
+#####      : scccd                    #####
+#####      : list_of_introductions    #####
+#####      : covering_dict            #####
+#####      : intro_list               #####
+#####      : freq_list                #####
+#####      : block_i                  #####
+#####      : new_point                #####
+#####
+#####
+###########################################
+def un_update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,list_of_elements_added,list_of_okay_starts):
+    for x in range(len(scccd[block_i])):
+        if scccd[block_i][x] == (new_point):
+            scccd[block_i][x] = "#"
+    freq_list[new_point] -= 1
+    delet_covering(list_of_introductions[-1],new_point,covering_dict)
+    del list_of_elements_added[-1]
+#    print("")
+#    print("UN-UPDATED SCCCD (vanilla):")
+#    print_design(scccd)
+#    print("INTROduction LIST NOW: ", list_of_introductions)
+    return
+
+
+            
+###################################################
+##### NAME : generate_initial_coverings       #####
+##### IN   : all_potential_block_list_stage_1 #####
+#####      : covering_dict                    #####
+##### OUT  : covering_dict                    #####
+###################################################
+def generate_initial_coverings(all_potential_block_list_stage_1,covering_dict):
+    introductions_list = []
+    for i in range (len(all_potential_block_list_stage_1)):
+        curr_introduced = -1
+        count           = 0
+        for x in all_potential_block_list_stage_1[i]:
+            if x in all_potential_block_list_stage_1[(i-1)%len(all_potential_block_list_stage_1)]:
+                continue
+            else :
+                curr_introduced = x
+                break
+                
+        if curr_introduced == -1:
+            introductions_list.append("")
+        else:
+            introductions_list.append(curr_introduced)
+            for x in all_potential_block_list_stage_1[i]:
+                if x != curr_introduced:
+                    add_covering(x,curr_introduced,covering_dict)                    
+    return covering_dict,introductions_list
+    
+###########################################
+##### NAME : add_design_to_found_list #####
+##### IN   : scccd                    #####
+#####      : found_designs            #####
+#####      : type                     #####
+###########################################
+def add_design_to_found_list(scccd,found_designs,type):
+    temp_design = []
+    for b in range(len(scccd)):
+        temp_block = []
+        for c in range(len(scccd[b])):
+            temp_block.append(scccd[b][c])
+        temp_design.append(temp_block)
+    found_designs[type].append(temp_design)
+    return
+
+############################################
+##### NAME : check_circular_property   #####
+##### IN   : scccd                     #####
+#####      : k                         #####
+#####      : bl_i (block_i)            #####
+#####      : found_designs             #####
+#####      : type                      #####
+#####      : intro_limit               #####
+#####      : intro_list                #####
+#####      : freq_limit                #####
+#####      : freq_list                 #####
+#####      : t_i                       #####
+#############################################    
+def check_circular_property(scccd,k,bl_i,found_designs,type,intro_limit,intro_list,freq_limit,freq_list,t_i):
+#    print ("WE HAVE A CONTENDER")
+    unchangedsubset_count = 0
+    for i in scccd[bl_i]:
+        if i in scccd[0]:
+            unchangedsubset_count += 1
+    if unchangedsubset_count != (k-1): 
+#        print ("We are not a contender because the  the unchanged subset count is " +str(unchangedsubset_count)+" and not "+str(k-1)+" like it should be!")
+#        print_design(scccd)
+        return
+    for a in range(len(intro_limit)):
+        if intro_limit[a] != intro_list[a]:
+#            print ("We are not a contender because "+ str(a)+" was introduced "+str(intro_list[a])+ " times when it should be introduced "+str(intro_limit[a])+" times!")
+#            print_design(scccd)
+            return
+    for a in range(t_i[0],len(freq_limit)):
+        if freq_limit[a] != freq_list[a]:
+#            print ("We are not a contender because "+ str(a)+" occurs with frequency "+str(freq_list[a])+ " when it should occur "+str(freq_limit[a])+" times!")
+#            print_design(scccd)
+            return
+    add_design_to_found_list(scccd,found_designs,type)
+    p_str = "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTHE COMPLETED DESIGN IS: \n"
+    print(p_str)
+    print_design(scccd)
+    print ("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv")
+    return
+
+
+
+
+
+############################################################################
+##### NAME : complete_the_scccd                                        ##### #gets the design ready for the recursive search
+##### IN   : v                                                         #####
+#####      : all_potential_block_list_stage_1 (aka the design so far)  #####
+#####      : t_i  #number of introductions                             #####
+#####      : f_i  #frequency                                           #####
+#####      : type #labled by the t_i,f_i                               #####
+#####      : skeleton
+############################################################################
+def complete_the_scccd(v,k,scccd,t_i,f_i,type,found_designs,skeleton):
+
+    list_of_introductions  = []
+    list_of_elements_added = []
+    
+#    print ("introductions" , list_of_introductions)
+    intro_list            = []
+    freq_list             = []
+    for j in range (v):
+        intro_list.append(0)
+        freq_list.append(0)   
+    intro_limit = []
+    freq_limit  = []
+    for j in range(len(t_i)):
+        for a in range(t_i[j]):
+            intro_limit.append(j+1)
+            freq_limit.append(f_i[j])
+    
+    covering_dict = generate_covering_dict(v)
+    
+    ### We will use the list of okay starts to keep track of the range of numbers in each t_i we are allowed.
+    ### The odd numbers are where the range for the relevant t_i section begins.
+    ### The even numbers are where the range for the relevant t_i section ends. 
+    ### If we have not added a valid number yet, the ends is one lower because we can add up to one higher then the low count
+    ### For example before we modify the skeleton, the array might look like [6,5,9,8,23,22]
+    ### After we add  one thing in t_2 the array becomes                     [6,6,9,8,23,22]
+    ### In our smalest case the 9,4 the array is only [6,6].
+    list_of_okay_starts = []
+    e = 0
+    for d in range(len(t_i)-1):
+        e = e + t_i[d]
+        list_of_okay_starts.append(e)    
+        list_of_okay_starts.append(e-1) # done 2x on purpose see note above
+                        
+#    print ("intro limit is:", intro_limit)
+#    print ("freq limit is:", freq_limit)
+    ################################
+
+    print ("")
+#    print ("NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT")
+#    print ("NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT")
+#    print ("NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT-NEXT")
+#    print ("WE ARE TESTNG THE NEXT DESIGN!")
+#    print ("lis of okay starts:",list_of_okay_starts)
+#    print_design(scccd)
+
+    recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,0,type,t_i,found_designs,list_of_elements_added,list_of_okay_starts,skeleton) 
+    return
+
+########################################
+##### NAME : recursive_search
+##### IN   : 
+#####      : 
+#####      : 
+##### OUT  : all_designs
+##### NOTE : '#' is a place holder in the design
+########################################
+#def recursive_search(partial,introductions_list,choice_list,covering_dict,v,k,t1,last_added,last_block,fail_flag):
+def recursive_search(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i,found_designs,list_of_elements_added,list_of_okay_starts, skeleton):
+#    print ("------------------------------------------------------------------------")
+#    print ("\n\n RECURSION STARTS : we are looking on block "),
+#    print (block_i),
+#    print ("\n")
+#    print ("The list of okay starts is: "),
+#    print (list_of_okay_starts)
+ #    print ("The Design at the start of this recursion is: ")
+ #    print_design(scccd)
+    new_point = -1
+    if block_i == len(scccd): #check if block 0 and b are single change. CHECK THE INTRODUCTIONS AND FREQUENCE ARE CORRECT. If so add to found designs and return
+        if "#" not in scccd[block_i-1]:     #            if (len(scccd[block_i-1])) == (k):            
+            check_circular_property(scccd,k,block_i-1,found_designs,type,intro_limit,intro_list,freq_limit,freq_list,t_i)            
+            return
+    ###################################
+    ###################################    
+    empty_list = []
+    if (list_of_introductions == empty_list): # FOR THE FIRST BLOCK SO WE DONT GET SOMETHING ACCESSING AN EMPTY LIST (THE FIRST INTRO WILL ALWAYS BE 0 WLOG)
+        list_of_introductions.append(0)
+        new_point = 0
+        update_no_new_point_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,intro_limit,freq_limit,type,t_i,found_designs,list_of_elements_added, list_of_okay_starts,skeleton)        
+        return  
+    ###################################################################            
+    new_point_forced = false    
+    if len(list_of_introductions) == (block_i): # THIS CHECKS TO SEE IF THE BLOCK WE ARE IN ALREADY HAS AN ELEMENT INTRODUCED, If it does then this element is FORCED and we continue on
+        #should i just change to k? instead of len(scccd[block_i]))
+        for l in range(len(scccd[(block_i)])): # for l in range of the size of the next block
+            if scccd[block_i][l] != "#":
+                if scccd[(block_i)%(len(scccd))][l] not in scccd[( (block_i-1) % len(scccd) )]: # for each point in the current block not in the previous : IE the introduced element
+                    new_point = scccd[(block_i) % len(scccd)][l] # if there is a point in the current block not in prev block then it must be the new point
+                    new_point_forced = true
+#                    print ("NEW POINT FORCED TURE!")
+                    continue
+    ###################################################################
+    # I think i can eliminate this first if statement. since we checked the empty list above and broke? <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    if list_of_introductions != []: # the intro list is not empty
+        if new_point_forced and len(list_of_introductions)<block_i+1: # if intro list is smaller then the block we are on then we need to introduce some element for the block           
+            for a in (scccd[block_i-1]):
+                if scccd[block_i].index(new_point) != scccd[block_i-1].index(a):
+                    if (check_if_already_covered(a,new_point,covering_dict) == true): #and a != new_point):
+                        return
+                    ### We already know we are adding something from t_1 here, and where that all happend 
+                    ###   so we dont need to check freq_limit or intro_limit, we know it will pass.                    
+            list_of_introductions.append(new_point)
+            update_no_new_point(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,block_i,new_point,intro_limit,freq_limit,type,t_i,found_designs,list_of_elements_added, list_of_okay_starts, skeleton)
+            if list_of_introductions[-1] == new_point:
+                del list_of_introductions[-1]                   
+        else:
+#            print ("length of the list of introductions is:"+str(len(list_of_introductions)))
+#            print ("we are on block : "+str(block_i))
+            for new_point in range(t_i[0],v):
+#                print ("NEW POINT NOT FORCED!")
+                # WE DONT KNOW WHAT IS INTRODUCED THIS BLOCK
+                # IF the length of the list of introductions == the block we are on, then we have not introduced an element in the present block
+                if len(list_of_introductions) == block_i: 
+                    flag_already_covered = false
+                    ### ok, lets use equivalce flag to stop from using 7 before 6 in the 9,4 example # for opt 1 
+                    ### FALSE means its not the same so we can keep going 
+                    ### True means give up on this and backtrack!
+                    ### we start as true and switch to fail if the digit is indeed valid!
+                    ### equivalence_flag = true # dont define here, it does not take to the new point for some reason
+                    ### pos_of_list_of_okay_starts = -1 # this tells us what okay starts to modify in the update
+                    #################################################################################################
+                    ### MAKING SURE WE DIDNT ALREADY COVER HAS MOVED INTO THE UPDATE FUNCTION
+                    ### THIS WILL ALLOW FOR OPTIMIZATION 5
+                    #################################################################################################                    
+                    #################################################
+                    # This makes sure that we add 8 before 9 to the design. (example)
+##                  ##
+                    # In order to implement this with multiple t_i? and not using a list      
+                    #################################################                
+                    #########################################
+                    ###           OPTIMIZATION 1          ###
+                    #########################################
+                    ### The next 5 lines make sure that 6 enters before 7
+                    low_num_intro_first = optimize_lower_number_introduced_first(list_of_okay_starts,new_point,true, -1)
+                    equivalence_flag           =low_num_intro_first[0]
+                    if equivalence_flag == true:
+                        continue
+#                    print("equivalence flag is", equivalence_flag)
+                    pos_of_list_of_okay_starts =low_num_intro_first[1]
+#                    print("pos of list of okay starts is"+str(low_num_intro_first[1]))
+#                    print("list of okay starts: "+str(list_of_okay_starts))
+                    #########################################                                                       
+                    if check_if_new_point_exceeds_intro(new_point,intro_list,intro_limit) == true:
+                        continue
+                    if check_if_new_point_exceeds_freq(new_point,freq_list,freq_limit) == true:
+                        continue
+                    #########################################
+                    ###           OPTIMIZATION 4          ###
+                    #########################################                   
+                    ### Check if new point and the stuff before are both in or out of B_0
+                    ### If yes, check if they have the same number of introductions left
+                    ### If yes, check if they have covered the same pairs
+                    ### If yes, then we only let the lower number be introduced, i.e. not this one
+                    #########################################
+#                    flag_using_opt_4 = false
+#                    for lower_val_point in range(t_i[0],new_point): 
+#                        if ((new_point in scccd[0]) and (lower_val_point in scccd[0])) or ((new_point not in scccd[0]) and (lower_val_point not in scccd[0])):
+#                            if (intro_limit[new_point]-intro_list[new_point]) == (intro_limit[lower_val_point]-intro_list[lower_val_point]):
+#                                if covering_dict[new_point] == covering_dict[lower_val_point]:
+#                                    flag_using_opt_4 = true
+#                                    break
+#                    if flag_using_opt_4 == true:
+#                        continue
+                    #########################################
+                    ###           OPTIMIZATION 4          ###
+                    #########################################
+                    ### END PERMUTATIONS #aa)
+                    #########################################
+                    # will get 13 designs in testing skeleton unless this applys to them 
+                    # print out for comparitson before i run this
+                    # Still in the --> if (block_i>2) 
+                    apply_opt_4_flag = false
+                    ### OPT 4 :  BOTH IN 1ST BLOCK
+                    if new_point in scccd[0]:
+                        for ii in range(t_i[0],new_point):
+                            if ii in scccd[0]:
+                                if (intro_limit[new_point]-intro_list[new_point]) == (intro_limit[ii]-intro_list[ii]):
+                                    if len(covering_dict[new_point]) == len(covering_dict[ii]):
+                                        ### We need to compare the covering dictionaries of these two points now
+                                        ### They will not be equal though because they are not in their own dictionary
+                                        point_one_list = []
+                                        point_two_list = []
+                                        for ee in range(len(covering_dict[new_point])):
+                                            if covering_dict[new_point][ee] != ii:
+                                                point_one_list.append(covering_dict[new_point][ee])
+                                            if covering_dict[ii][ee] != new_point:
+                                                point_two_list.append(covering_dict[ii][ee])
+                                        did_we_break = false
+                                        for ee in range(len(point_one_list)):
+                                            if point_one_list[ee] not in point_two_list:
+                                                did_we_break = true
+                                                break
+                                        if did_we_break == false:
+                                            apply_opt_4_flag = true
+                    ### OPT 4 :  BOTH OUT OF 1ST BLOCK
+                    else: # if new_point it not in block 1
+                        for ii in range(t_i[0],new_point):
+                            if ii not in scccd[0]:
+                                if (intro_limit[new_point]-intro_list[new_point]) == (intro_limit[ii]-intro_list[ii]):
+                                    if len(covering_dict[new_point]) == len(covering_dict[ii]):
+                                        ### We need to compare the covering dictionaries of these two points now
+                                        ### They will not be equal though because they are not in their own dictionary
+                                        point_one_list = []
+                                        point_two_list = []
+                                        for ee in range(len(covering_dict[new_point])):
+                                            if covering_dict[new_point][ee] != ii:
+                                                point_one_list.append(covering_dict[new_point][ee])
+                                            if covering_dict[ii][ee] != new_point:
+                                                point_two_list.append(covering_dict[ii][ee])
+                                        did_we_break = false
+                                        for ee in range(len(point_one_list)):
+                                            if point_one_list[ee] not in point_two_list:
+                                                did_we_break = true
+                                                break
+                                        if did_we_break == false:
+                                            apply_opt_4_flag = true
+                    if apply_opt_4_flag == true:
+                        continue        
+                    #########################################                    
+                    update(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added, list_of_okay_starts,new_point,pos_of_list_of_okay_starts,skeleton)
+                ##########################################
+                else : #IF WE ALREADY KNOW WHAT WAS INTRODUCED HERE  
+                       #SO THE ELEMENT WE ARE DEALING WITH MUST BE IN THE UNCHANGED SUBSET!                                        
+                    # We need to consider the first block seperatly since stuff can move
+                    if block_i == 0:
+                        #########################################
+                        ###           OPTIMIZATION 1          ###
+                        #########################################
+                        ### The next 5 lines make sure that 6 enters before 7
+                        low_num_intro_first = optimize_lower_number_introduced_first(list_of_okay_starts,new_point,true, -1)
+                        equivalence_flag           =low_num_intro_first[0]
+                        if equivalence_flag == true:
+                            continue
+#                        print("equivalence flag is", equivalence_flag)
+                        pos_of_list_of_okay_starts =low_num_intro_first[1]
+#                        print("pos of list of okay starts is"+str(low_num_intro_first[1]))
+#                        print("list of okay starts: "+str(list_of_okay_starts))
+                        #########################################
+                        if new_point in scccd[block_i]: # we dont need to check this if there is only one # in block 0, but if we have more then one we need this
+#                            print "we are somehow in this case?"
+                            continue
+                        update_single_element_first_block(v,k,scccd,list_of_introductions,covering_dict,intro_list,freq_list,intro_limit,freq_limit,block_i,type,t_i, found_designs, list_of_elements_added, list_of_okay_starts,new_point, pos_of_list_of_okay_starts,skeleton)
+                                                                                                       
+#    print ("ONE RECURSIVE SEARCH ENDED")
+
+    return
+
+
+import time
+################
+##### MAIN #####
+################
+def main(v,k):
+    start_time = time.time()
+    summing = 0
+    print (v,"v")
+    print (k,"k")
+    b = binomial(v,2)/(k-1)
+    A = floor((v-1)/(k-1))
+    print ("A = ",A)
+    
+    flag_first = true
+
+    f_i = []
+    for i in range (A):
+        f_i.append((v-1)-(i+1)*(k-2))
+#    f1 = (v-1)-1*(k-2)
+    print ("f_i " , f_i)
+
+    master_t_list = generate_t_values(v,k)   
+    found_designs = {}
+    design_count = 0
+    #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<#
+    for i in range(3,len(master_t_list)):# (3) len(master_t_list)): 
+        print("We are testing type "+str(i+1)+" of "+str(len(master_t_list)))
+        t_i = []
+        for j in range (len(master_t_list[i])):
+            t_i.append(master_t_list[i][j])
+
+        if t_i[0] == 0:
+            print ("NOT POSSIBLE TO BUILD A SF ARRAY for TIGHT CIRCULAR SCCD("+str(v)+","+str(k)+"), as t1 = 0 : The values are: t_i="+str(t_i)+"f_i= "+str(f_i) )
+            print ("************************************************************************")
+            continue
+        all_valid_sf_array         = generate_all_valid_sf_array(v,k,b,t_i,f_i)
+        print ("The valid sf_arrays are", all_valid_sf_array)    
+
+        all_possible_skeletons     = generate_all_skeletons(all_valid_sf_array,f_i,b)
+#        print (all_possible_skeletons)
+
+        all_valid_skeletons        = check_all_possible_skeletons(all_valid_sf_array,all_possible_skeletons,f_i)
+#        print ("VALID : ", all_valid_skeletons) #DEBUGGING
+          
+        if len(all_valid_skeletons) == 0:
+            print ("NOT POSSIBLE TO BUILD A TIGHT CIRCULAR SCCD("+str(v)+","+str(k)+"), with t_i="+str(t_i)+"f_i= "+str(f_i) )
+            print ("************************************************************************")
+            continue
+                    
+        print ("For t_values ", master_t_list[i] ," and f_values, f_i= ", f_i, ":")    
+        equivalence_skeletons             = eliminate_equivalence_classes(all_valid_skeletons)
+        print_equivalence_skeletons(equivalence_skeletons)
+        
+        optimal_skeletons = find_best_place_to_start_all_skeletons(b,equivalence_skeletons,f_i[0],k)
+        print_optimal_skeletons(optimal_skeletons)
+        
+        info_returned_from_all_potential_block_list_stage_1 = build_var_of_all_potential_block_list_stage_1(b,optimal_skeletons,f_i,k,t_i)
+        all_potential_block_list_stage_1 = info_returned_from_all_potential_block_list_stage_1[0]
+        skeleton_index = info_returned_from_all_potential_block_list_stage_1[1] 
+        print_block_list_stage_1(all_potential_block_list_stage_1)
+                
+        type = "scccd("+str(v)+","+str(k)+",2):"
+        for j in range(len(t_i)):
+            type = type + "t_{" + str(j+1) + "}=" + str(t_i[j])  
+            if j < len(t_i)-1:
+                type = type + ","
+        print ("type is: "+ type)
+        found_designs[type] = []
+        #print ("all_potential_block_list_stage_1")
+        #print_design(all_potential_block_list_stage_1)
+        print ("the LENGTH IS,******************", len(all_potential_block_list_stage_1[0][0]))
+        for a in range(len(all_potential_block_list_stage_1)): #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            scccd = all_potential_block_list_stage_1[a]
+            temp_time = time.time()            
+            print ("WE ARE ON DESIGN OPTION "+str(a+1)+" of "+str(len(all_potential_block_list_stage_1))+ " OF TYPE VARIATION "+str(i+1)+" of "+str(len(master_t_list))  )
+            complete_the_scccd(v,k,scccd,t_i,f_i,type,found_designs,optimal_skeletons[skeleton_index[a]])
+            print("THIS DESIGN OPTION TOOK "+str(time.time() - temp_time)+" to run\n")
+            save((found_designs[type]),DATA+"temporary_save___"+type)
+        print_block_list_stage_1
+        print("*************************************************************")
+        print ("WE HAVE FOUND THE COMPLETED DESIGNS of type: " +str(type))
+        print ("There are "+str(len(found_designs[type]))+" of them:")
+        for x in found_designs[type]:
+            print_design(x)
+            design_count += 1            
+        print("*************************************************************")                      
+        
+        summing += len(all_potential_block_list_stage_1)
+        print("printing what I saved")
+        print(found_designs[type])
+        if found_designs[type] == []:
+            found_designs[type] = "There are no designs of this type to be found."
+        save((found_designs[type]),DATA+type )
+        print ("************************************************************************")
+    print ("DONE - MAIN HAS ENDED")
+    print ("There are a total of "+str(summing)+" SF arrays") 
+    print ("There are a total of "+ str(design_count)+ " designs")
+    print ("My program took", time.time() - start_time, "to run")
+    return 
+    
+#######################################################################################################################
+#main(9,4)
+#main(10,4)
+main(12,4)
+#12,13,15,16,18,19,21,22,24,25 are needed for (v,4)
+#main(48,5)
+#16,17,24,25,32,33,40,41 are needed for (v,5)
+#main(16,5) 
